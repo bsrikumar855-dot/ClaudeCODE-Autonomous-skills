@@ -1,0 +1,22 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.claude/settings.local.json
+.claude/agent-memory-local/
+
+# Installer backups and test artifacts
+*.bak
+tmp/
+.tmp/
+
+# OS / editor / language
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+node_modules/

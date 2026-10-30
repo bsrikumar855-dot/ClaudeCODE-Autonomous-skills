@@ -1,1 +1,249 @@
-# ClaudeCODE-Autonomous-skills
+# AUTO-BUILDER — an autonomous development skill for Claude Code
+
+**AUTO-BUILDER** is a Claude Code [skill](https://code.claude.com/docs/en/skills) plus eight specialist [subagents](https://code.claude.com/docs/en/sub-agents). Give it a goal with `/auto-builder`; it runs a full engineering lifecycle — discovery, requirements, architecture, planning, implementation, independent verification, iteration and delivery — and only stops to ask you at consequential checkpoints.
+
+> An independent community project. Not affiliated with or endorsed by Anthropic, Boris Cherny or Andrej Karpathy; their public guidance is an inspiration only (see [principles](.claude/skills/auto-builder/principles/influences-and-sources.md)).
+
+## Why it exists
+
+Left alone, a coding agent tends to jump straight to code, declare victory after one green build, and ask permission for trivia. AUTO-BUILDER encodes a different default: **plan first, verify with evidence, have someone other than the author review, and escalate only what is risky or irreversible.**
+
+## How it works
+
+Phases 0–8, with a bounded fix loop (per-check attempt limit plus an iteration budget) and explicit approval gates:
+
+```mermaid
+flowchart TD
+    G([/auto-builder goal]) --> P0[0 Reconnaissance]
+    P0 --> P1[1 Discovery]
+    P1 --> P2[2 Product definition]
+    P2 --> P3[3 Architecture]
+    P3 --> P4[4 Execution planning]
+    P4 --> CA{{Checkpoint A: direction<br/>when consequential or requested}}
+    CA --> P5[5 Implementation]
+    P5 --> P6[6 Independent verification]
+    P6 --> P7{7 Acceptance criteria<br/>all verified?}
+    P7 -- no, fixable --> P5
+    P7 -- blocked after 3 attempts --> ASK([Ask user one focused question])
+    P7 -- yes --> P8[8 Delivery report]
+
+    subgraph Agents[Specialist subagents]
+      PM[product-manager]
+      RS[researcher]
+      AR[architect]
+      FE[frontend-engineer]
+      BE[backend-engineer]
+      AI[ai-engineer]
+      QA[qa-engineer]
+      CR[critical-reviewer]
+    end
+    P1 -.-> RS
+    P2 -.-> PM
+    P3 -.-> AR
+    P5 -.-> FE & BE & AI
+    P6 -.-> QA & CR
+```
+
+The lead agent (your main Claude Code session) owns integration. Subagents get a precise brief and report back; they start without your conversation and cannot ask you questions. They share your working tree unless you opt into worktree isolation, so file ownership is assigned explicitly and only the lead commits. Project memory lives in files under `docs/auto-builder/` in your project, not in the conversation.
+
+### Agents
+
+| Agent | Responsibility | Can edit files |
+|---|---|---|
+| `product-manager` | Users, journeys, scope, acceptance criteria | no |
+| `researcher` | Current libraries/APIs/alternatives from primary sources | no |
+| `architect` | Architecture, schemas, plan critique | no |
+| `frontend-engineer` | UI, accessibility, responsive behaviour | yes (assigned files) |
+| `backend-engineer` | APIs, databases, integrations, pipelines | yes (assigned files) |
+| `ai-engineer` | LLM/RAG/agents/evals/ML pipelines | yes (assigned files) |
+| `qa-engineer` | Independent test runs, edge-case probing, proposes tests | no |
+| `critical-reviewer` | Adversarial review of plans and diffs | no |
+
+Read-only status: `architect`, `product-manager`, `researcher` and `qa-engineer` have no Edit/Write tools. `critical-reviewer` and `qa-engineer` also have Bash to run checks, which Claude Code cannot restrict by argument, so they are *instructed* not to modify files rather than technically prevented. `researcher` and `product-manager` can fetch web pages, so treat fetched content as untrusted.
+
+Rules: spawn only what the task needs; parallelise only independent work; never let two agents edit the same file ([details](.claude/skills/auto-builder/references/parallel-work.md)).
+
+### Supported project types
+
+AI/ML apps · AI agents and multi-agent systems · full-stack · frontend · backend/APIs · developer tools · research projects · automation · data engineering. See the [category guide](.claude/skills/auto-builder/references/project-categories.md).
+
+## Install
+
+Requires [Claude Code](https://code.claude.com). The installer copies files only: it **never** overwrites existing files (use `--update` to opt in, with `.bak` backups) and never touches settings, permissions, hooks or `CLAUDE.md`.
+
+**Linux / macOS / WSL / Git Bash**
+
+```bash
+git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills
+cd ClaudeCODE-Autonomous-skills
+./install.sh --personal                 # all your projects: ~/.claude/
+./install.sh --project /path/to/repo    # one project: <repo>/.claude/
+./install.sh --project --dry-run        # preview into the current directory
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills
+cd ClaudeCODE-Autonomous-skills
+.\install.ps1 -Personal                 # %USERPROFILE%\.claude\
+.\install.ps1 -Project -Path C:\path\to\repo
+.\install.ps1 -Project -DryRun
+```
+
+If scripts are blocked: `powershell -ExecutionPolicy Bypass -File .\install.ps1 -Personal`.
+
+**Manual:** copy `.claude/skills/auto-builder/` and `.claude/agents/*.md` into `~/.claude/` (personal) or your project's `.claude/`.
+
+Opening Claude Code *inside this repository* also works with no install — the skill is already in its `.claude/`.
+
+## Use
+
+```text
+/auto-builder Build an AI research workspace where users can upload papers, ask grounded questions, and explore citations. Don't deploy anything.
+```
+
+Run `/auto-builder` with no argument and it will inspect the repo and ask for one goal. More examples: [examples/goal-prompt.md](.claude/skills/auto-builder/examples/goal-prompt.md).
+
+### Example session (illustrative)
+
+```text
+> /auto-builder Add a rate-limited /v1/orders API with pagination and tests
+
+[Phase 0] Python/FastAPI, pytest, ruff, Postgres via docker-compose. git clean on main.
+          Created branch auto-builder/orders-api.
+[Phase 1-2] Consumers: internal dashboard. Assumed cursor pagination (documented in DECISIONS.md).
+          Acceptance: AC1 list paginates; AC2 429 after limit; AC3 invalid cursor -> 422; AC4 authz enforced.
+[Phase 3-4] architect agent critique: store limiter state in Redis rather than in-process -> accepted.
+          TASKS.md: 5 tasks. Checkpoint A: new Redis dependency (local only). Proceed? 
+> yes
+[Phase 5] backend-engineer: endpoints + limiter. Checkpoint commit "orders: list endpoint".
+[Phase 6] pytest: 2 failed -> fixed -> 31 passed. ruff, mypy clean. critical-reviewer: 1 major
+          (cursor not bound to user) -> fixed, re-verified. qa-engineer: AC1-AC4 verified.
+[Phase 8] Delivered. Not run: load test, deployment. Branch not pushed.
+```
+
+This is a mock-up of the intended flow, not captured output or a benchmark.
+
+## Configuration
+
+| What | How |
+|---|---|
+| Allow Claude to load the skill automatically | In `SKILL.md` frontmatter remove `disable-model-invocation: true` (default is explicit `/auto-builder` only; note that scheduled/`/loop` re-entry then won't trigger it either) |
+| Skip git branch/commits | Say "no branch and no commits" in the goal. With a dirty working tree the skill never commits your uncommitted changes and asks if it must edit a file you've modified |
+| Require approval of the plan | Say "stop at the plan checkpoint" in the goal |
+| Change agent models/limits | Edit `model`, `maxTurns`, `tools` in `.claude/agents/<name>.md` ([fields](https://code.claude.com/docs/en/sub-agents)) |
+| Remove an agent | Delete its file; the lead performs that role itself |
+| Project facts | Keep short build/test commands and conventions in your project's `CLAUDE.md` |
+
+### Hooks (optional, off by default)
+
+Two deterministic helpers ship in `scripts/hooks/` but are **not** installed into your settings. To enable, add to `.claude/settings.json` (project) or `~/.claude/settings.json` (personal; replace the path with `"$HOME"/.claude/skills/...`). Requires `jq`; scripts are bash (Git Bash/WSL on Windows). Limits: `protect-secrets.sh` checks file paths of Edit/Write/NotebookEdit only (not Bash commands or Read; use `permissions.deny` for those). `verify-on-stop.sh` retries up to `AUTO_BUILDER_MAX_RETRIES` (default 5) times, has a timeout, then lets Claude stop, so it is a strong nudge rather than an absolute gate. `AUTO_BUILDER_CHECK_CMD` runs as shell: set it only in your own settings, never accept it from an untrusted repository. A zip download may lose the executable bit (`chmod +x`).
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [{ "type": "command",
+          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/skills/auto-builder/scripts/hooks/protect-secrets.sh" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command",
+          "command": "AUTO_BUILDER_CHECK_CMD='npm test' \"$CLAUDE_PROJECT_DIR\"/.claude/skills/auto-builder/scripts/hooks/verify-on-stop.sh" }] }
+    ]
+  }
+}
+```
+
+## Human approval and safety
+
+Default mode: **full autonomy with critical checkpoints.** No questions about ordinary implementation, refactoring, debugging, tests, docs or in-scope architecture. It asks *before*: destructive database operations, production deployment, spending money/enabling paid services, exposing secrets, deleting important data, irreversible external actions (including pushing or opening PRs), and major changes of product direction.
+
+It also: works on a fresh git branch, never pushes or opens PRs on its own, never asks to bypass Claude Code permissions or sandboxing, requires an independent review (and says so in the report if the reviewer agents are missing), and is told to report unrun checks honestly. These are instructions to the model, not hard guarantees — use Claude Code's [permissions and sandboxing](https://code.claude.com/docs/en/settings) as the enforcement layer, and review the diff yourself. Foreground subagent permission prompts reach you, so a hands-off run needs your commonly used test/lint/build commands pre-allowed; prefer narrow allow rules over bypass modes.
+
+## Repository layout
+
+```text
+.
+├── .claude/
+│   ├── agents/
+│   │   ├── ai-engineer.md
+│   │   ├── architect.md
+│   │   ├── backend-engineer.md
+│   │   ├── critical-reviewer.md
+│   │   ├── frontend-engineer.md
+│   │   ├── product-manager.md
+│   │   ├── qa-engineer.md
+│   │   └── researcher.md
+│   └── skills/
+│       └── auto-builder/
+│           ├── examples/
+│           │   └── goal-prompt.md
+│           ├── principles/
+│           │   └── influences-and-sources.md
+│           ├── references/
+│           │   ├── claude-code-features.md
+│           │   ├── parallel-work.md
+│           │   └── project-categories.md
+│           ├── scripts/
+│           │   ├── hooks/
+│           │   │   ├── protect-secrets.sh
+│           │   │   └── verify-on-stop.sh
+│           │   └── init-artifacts.sh
+│           ├── templates/
+│           │   ├── ARCHITECTURE.md
+│           │   ├── DECISIONS.md
+│           │   ├── PROJECT.md
+│           │   ├── REQUIREMENTS.md
+│           │   ├── TASKS.md
+│           │   └── TESTING.md
+│           ├── workflows/
+│           │   ├── delivery.md
+│           │   ├── discovery.md
+│           │   ├── implementation.md
+│           │   ├── planning.md
+│           │   └── verification.md
+│           └── SKILL.md
+├── .github/
+│   └── workflows/
+│       └── validate.yml
+├── tests/
+│   ├── test-install.sh
+│   └── validate.py
+├── .gitignore
+├── CHANGELOG.md
+├── CLAUDE.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+├── install.ps1
+└── install.sh
+```
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `/auto-builder` not listed | Confirm `<project or ~>/.claude/skills/auto-builder/SKILL.md` exists; restart the Claude Code session |
+| Agents not used | Confirm files in `.claude/agents/`; a pre-existing agent with the same name wins and the installer reports `PRESERVE` |
+| Installer says `STALE` / `CONFLICT` | `STALE`: file from an older version, safe to delete by hand. `CONFLICT`: a symlink or directory sits where a file belongs; resolve manually |
+| Installer says `PRESERVE` | Your file differs from the package; keep it, or run with `--update` / `-Update` (backup saved as `.bak`) |
+| `Permission denied` on scripts | `chmod +x .claude/skills/auto-builder/scripts/*.sh .claude/skills/auto-builder/scripts/hooks/*.sh install.sh` |
+| Hooks do nothing | Install `jq`; check the command path and the JSON in settings |
+| PowerShell blocks `install.ps1` | See execution-policy note above |
+| Claude pauses a lot | Normal for checkpoints; tell it which category of decision to default on, or tighten permission rules |
+
+## Verification status
+
+A live, end-to-end `/auto-builder` run has **not** been performed. Partial evidence: Claude Code's agent registry listed the eight project agents once they existed in `.claude/agents/`.
+
+The checks (`python3 -I tests/validate.py`, `bash tests/test-install.sh`) pass on Linux locally; a GitHub Actions workflow is included but has not run yet. **Not verified:** a live `/auto-builder` run inside Claude Code, and `install.ps1` on Windows. Please report issues.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE).

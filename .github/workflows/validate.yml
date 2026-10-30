@@ -1,0 +1,16 @@
+name: validate
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static validation
+        run: python3 -I tests/validate.py
+      - name: Installer tests
+        run: bash tests/test-install.sh
