@@ -1,0 +1,42 @@
+<h1>Install the AUTO-BUILDER Claude Code skill</h1>
+<p class="lead">Requires <a href="https://code.claude.com">Claude Code</a> and Git. The installer only copies files: it never edits your settings, permissions, hooks or <code>CLAUDE.md</code>.</p>
+<p class="toc">Jump to: <a href="#unix">Linux / macOS / WSL</a> &middot; <a href="#windows">Windows</a> &middot; <a href="#manual">Manual</a> &middot; <a href="#verify">Verify</a> &middot; <a href="#update">Update</a> &middot; <a href="#hooks">Hooks</a> &middot; <a href="#uninstall">Uninstall</a></p>
+
+<h2 id="unix">Linux, macOS, WSL and Git Bash</h2>
+<div class="codeblock"><pre><code>git clone {{GH}}.git
+cd ClaudeCODE-Autonomous-skills
+
+./install.sh --personal                 # all your projects (~/.claude)
+./install.sh --project /path/to/repo    # one project (&lt;repo&gt;/.claude)
+./install.sh --project --dry-run        # preview, writes nothing</code></pre></div>
+
+<h2 id="windows">Windows (PowerShell)</h2>
+<div class="codeblock"><pre><code>git clone {{GH}}.git
+cd ClaudeCODE-Autonomous-skills
+
+.\install.ps1 -Personal
+.\install.ps1 -Project -Path C:\path\to\repo
+.\install.ps1 -Project -DryRun</code></pre></div>
+<div class="note"><code>install.ps1</code> has not been executed by the author yet (no PowerShell was available during development). It mirrors the tested shell installer; please report any problem as an issue. If scripts are blocked: <code>powershell -ExecutionPolicy Bypass -File .\install.ps1 -Personal</code>.</div>
+
+<h2 id="manual">Manual install</h2>
+<p>Copy <code>.claude/skills/auto-builder/</code> and <code>.claude/agents/*.md</code> from the repository into <code>~/.claude/</code> (personal) or your project's <code>.claude/</code> directory. Opening Claude Code inside the cloned repository also works without installing.</p>
+
+<h2 id="verify">Verify the installation</h2>
+<ol>
+<li>Confirm <code>SKILL.md</code> exists at <code>.claude/skills/auto-builder/SKILL.md</code> (project) or <code>~/.claude/skills/auto-builder/SKILL.md</code> (personal), and eight files exist in the matching <code>agents/</code> folder.</li>
+<li>Start a new Claude Code session and type <code>/auto-builder</code>; it should appear as a command.</li>
+</ol>
+<p>Installer output labels each file <code>INSTALL</code>, <code>UPDATE</code>, <code>PRESERVE</code> (yours differs and was kept), <code>CONFLICT</code> (a symlink or directory is in the way) or <code>STALE</code> (left over from an older version).</p>
+
+<h2 id="update">Update</h2>
+<div class="codeblock"><pre><code>git pull
+./install.sh --personal --update     # replaces differing package files, keeps .bak backups</code></pre></div>
+
+<h2 id="hooks">Enable the optional hooks</h2>
+<p>Hooks are off by default. The JSON to add to <code>.claude/settings.json</code>, and their limits, are in the <a href="{{GH}}#hooks-optional-off-by-default">README</a>. They require <code>jq</code>.</p>
+
+<h2 id="uninstall">Uninstall</h2>
+<p>Delete the <code>auto-builder</code> folder under <code>skills/</code> and the eight agent files (<code>product-manager.md</code>, <code>researcher.md</code>, <code>architect.md</code>, <code>frontend-engineer.md</code>, <code>backend-engineer.md</code>, <code>ai-engineer.md</code>, <code>qa-engineer.md</code>, <code>critical-reviewer.md</code>) from <code>agents/</code>. Check first that none are your own files of the same name.</p>
+
+<p>Next: <a href="usage.html">learn how to use it</a> or <a href="faq.html">read the FAQ</a>.</p>

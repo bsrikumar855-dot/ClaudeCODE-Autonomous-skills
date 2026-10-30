@@ -1,0 +1,42 @@
+<h1>Features: an autonomous Claude Code workflow with guardrails</h1>
+<p class="lead">Everything below exists in the repository today. Nothing here is a benchmark or a performance claim.</p>
+<p class="toc">On this page: <a href="#lifecycle">Lifecycle</a> &middot; <a href="#quality">Quality protocol</a> &middot; <a href="#agents">Subagents</a> &middot; <a href="#safety">Safety controls</a> &middot; <a href="#categories">Project categories</a> &middot; <a href="#install">Installers</a> &middot; <a href="#hooks">Hooks</a></p>
+
+<h2 id="lifecycle">Nine-step autonomous development lifecycle</h2>
+{{PHASE_LIST}}
+<p>The loop in phase 7 is bounded: three attempts per failing check and an iteration budget of five passes per milestone, recorded in the task file, so it is instructed not to run forever. Only you can accept a criterion as out of scope.</p>
+
+<h2 id="quality">Quality protocol: milestone gates and evidence</h2>
+<p>Quality, not speed, is the stated objective. The skill instructs the lead agent to:</p>
+<ul>
+<li><strong>Plan, then doubt the plan:</strong> write measurable acceptance criteria and risks first, and revisit decisions when evidence contradicts them.</li>
+<li><strong>Work in milestones</strong> that each pass a verification gate (tests, regression checks, review, evidence, updated state files) before the next begins.</li>
+<li><strong>Use an independent reviewer</strong> at meaningful milestones and for a final review, briefed to compare the work with the requirements, find gaps and challenge assumptions. If the reviewer agent is missing, the report must say the review was not independent.</li>
+<li><strong>Label evidence</strong> as Verified, Partially verified or Untested for every criterion, and never claim a check that was not run.</li>
+<li><strong>Recover from failure</strong> by finding the root cause, making the smallest fix and re-running the failed check and regressions, never repeating an identical failed approach, and stopping a workstream after three failed attempts.</li>
+<li><strong>Meet a completion standard</strong> (requirements implemented, criteria verified, critical tests passing, journeys working, no known critical defects, accurate docs, disclosed limitations) before calling the project done.</li>
+</ul>
+<p>This is an instruction system for the model, not a guarantee that the result is defect-free. Review the work yourself.</p>
+
+<h2 id="agents">Eight Claude Code subagents</h2>
+<p>Each subagent is a Markdown file in <code>.claude/agents/</code> with valid Claude Code frontmatter. Subagents start with no conversation history and cannot ask you questions, so the lead gives each a precise brief and integrates its output.</p>
+{{AGENT_TABLE}}
+<p>The reviewer and QA agent also have Bash to run checks. Claude Code cannot restrict Bash by argument, so they are <em>instructed</em>, not technically prevented, from modifying files.</p>
+
+<h2 id="safety">Safety and approval controls</h2>
+<ul>
+<li><strong>Ask first:</strong> destructive database operations, production deployments, spending money, exposing secrets, deleting important data, irreversible external actions (including pushing and opening pull requests), and major product-direction changes.</li>
+<li><strong>Independent review required</strong> for non-trivial changes. If the reviewer agents are not installed, the delivery report must say no independent review took place.</li>
+<li><strong>Git:</strong> instructed to work on an <code>auto-builder/&lt;slug&gt;</code> branch; only the lead commits, by explicit path; your uncommitted changes are not to be committed; nothing is to be pushed. Review <code>git log</code> and the diff yourself.</li>
+<li><strong>Explicit invocation only:</strong> <code>disable-model-invocation: true</code> means Claude never starts the skill on its own.</li>
+<li><strong>No permission bypass.</strong> Use Claude Code permissions and sandboxing as the enforcement layer; the skill's rules are instructions to the model.</li>
+</ul>
+
+<h2 id="categories">Project categories</h2>
+<p>AI/ML apps &middot; AI agents and multi-agent systems &middot; full-stack &middot; frontend &middot; backend/API &middot; developer tools &middot; research &middot; automation &middot; data engineering. A <a href="{{GH}}/blob/main/.claude/skills/auto-builder/references/project-categories.md">category guide</a> tunes discovery, architecture and verification per type.</p>
+
+<h2 id="install">Safe installers</h2>
+<p><code>install.sh</code> (Linux, macOS, WSL, Git Bash) and <code>install.ps1</code> (Windows PowerShell) install for one project or all projects. They support <code>--dry-run</code>, never overwrite your files unless you pass <code>--update</code> (which keeps numbered backups), refuse to replace symlinks, and report stale files from older versions. See the <a href="installation.html">installation guide</a>.</p>
+
+<h2 id="hooks">Optional hooks</h2>
+<p>Two opt-in <a href="{{GH}}/tree/main/.claude/skills/auto-builder/scripts/hooks">hook scripts</a> are included but never enabled automatically: <code>protect-secrets.sh</code> blocks edits to secret-bearing file paths, and <code>verify-on-stop.sh</code> runs your check command before Claude finishes, with bounded retries and a timeout. Limits: the first does not cover Bash or Read, and the second is a strong nudge rather than an absolute gate.</p>

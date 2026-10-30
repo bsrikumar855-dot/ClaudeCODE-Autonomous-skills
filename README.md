@@ -1,12 +1,33 @@
-# AUTO-BUILDER — an autonomous development skill for Claude Code
+# AUTO-BUILDER: an autonomous coding agent skill for Claude Code
 
-**AUTO-BUILDER** is a Claude Code [skill](https://code.claude.com/docs/en/skills) plus eight specialist [subagents](https://code.claude.com/docs/en/sub-agents). Give it a goal with `/auto-builder`; it runs a full engineering lifecycle — discovery, requirements, architecture, planning, implementation, independent verification, iteration and delivery — and only stops to ask you at consequential checkpoints.
+[![validate](https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/actions/workflows/validate.yml/badge.svg)](https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/actions/workflows/validate.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![Claude Code skill](https://img.shields.io/badge/Claude%20Code-skill%20%2B%208%20subagents-0b5fff)
+![Status](https://img.shields.io/badge/status-early%20release-orange)
+
+**AUTO-BUILDER** is an open-source [Claude Code skill](https://code.claude.com/docs/en/skills) plus eight specialist [subagents](https://code.claude.com/docs/en/sub-agents) for goal-driven autonomous development. Give `/auto-builder` a goal; it runs an AI software development workflow (discovery, requirements, architecture, planning, implementation, independent verification, iteration and delivery) and only stops to ask you at consequential checkpoints.
+
+**Website and docs:** <https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/> (features, installation, usage tutorial, architecture, FAQ)
 
 > An independent community project. Not affiliated with or endorsed by Anthropic, Boris Cherny or Andrej Karpathy; their public guidance is an inspiration only (see [principles](.claude/skills/auto-builder/principles/influences-and-sources.md)).
 
+## Quick start
+
+```bash
+git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills
+cd ClaudeCODE-Autonomous-skills
+./install.sh --personal        # or: ./install.sh --project /path/to/repo
+```
+
+Then in Claude Code: `/auto-builder Build a REST API for a habit tracker with tests`. Windows: `.\install.ps1 -Personal` (see [Install](#install)).
+
+**Status: early release.** The static checks and installer/hook tests pass, but the skill has not been validated end-to-end in live Claude Code sessions, and `install.ps1` has not been executed on Windows. See [Verification status](#verification-status).
+
+**Contents:** [Why](#why-it-exists) · [How it works](#how-it-works) · [Install](#install) · [Use](#use) · [Configuration](#configuration) · [Safety](#human-approval-and-safety) · [Troubleshooting](#troubleshooting) · [Contributing](#contributing)
+
 ## Why it exists
 
-Left alone, a coding agent tends to jump straight to code, declare victory after one green build, and ask permission for trivia. AUTO-BUILDER encodes a different default: **plan first, verify with evidence, have someone other than the author review, and escalate only what is risky or irreversible.**
+Left alone, an autonomous coding agent tends to jump straight to code, declare victory after one green build, and ask permission for trivia. AUTO-BUILDER encodes a different default: **plan first, verify with evidence, have someone other than the author review, and escalate only what is risky or irreversible.**
 
 ## How it works
 
@@ -24,7 +45,7 @@ flowchart TD
     P5 --> P6[6 Independent verification]
     P6 --> P7{7 Acceptance criteria<br/>all verified?}
     P7 -- no, fixable --> P5
-    P7 -- blocked after 3 attempts --> ASK([Ask user one focused question])
+    P7 -- bound hit, nothing independent left --> STOP([Stop: mark incomplete, report blocker + recommended decision])
     P7 -- yes --> P8[8 Delivery report]
 
     subgraph Agents[Specialist subagents]
@@ -43,6 +64,8 @@ flowchart TD
     P5 -.-> FE & BE & AI
     P6 -.-> QA & CR
 ```
+
+**Quality protocol.** Work proceeds in milestones that each pass a verification gate (tests, regression checks, evidence, updated state files) before the next starts. A separate reviewer is used at meaningful milestones and for a final review; every criterion is reported as Verified, Partially verified or Untested; failures are root-caused and capped at three attempts. This is an instruction system for the model, not a guarantee of defect-free software.
 
 The lead agent (your main Claude Code session) owns integration. Subagents get a precise brief and report back; they start without your conversation and cannot ask you questions. They share your working tree unless you opt into worktree isolation, so file ownership is assigned explicitly and only the lead commits. Project memory lives in files under `docs/auto-builder/` in your project, not in the conversation.
 
@@ -130,8 +153,9 @@ This is a mock-up of the intended flow, not captured output or a benchmark.
 | What | How |
 |---|---|
 | Allow Claude to load the skill automatically | In `SKILL.md` frontmatter remove `disable-model-invocation: true` (default is explicit `/auto-builder` only; note that scheduled/`/loop` re-entry then won't trigger it either) |
-| Skip git branch/commits | Say "no branch and no commits" in the goal. With a dirty working tree the skill never commits your uncommitted changes and asks if it must edit a file you've modified |
+| Skip the git work branch | Say "no branch" in the goal (the skill only creates one if you haven't declined). Checkpoint commits are local, made only by the lead; review them with `git log`. With a dirty working tree it is instructed never to commit your uncommitted changes and to ask if it must edit a file you've modified |
 | Require approval of the plan | Say "stop at the plan checkpoint" in the goal |
+| Retry/iteration limits | Defaults are 3 attempts per failing check and 5 implement→verify passes per milestone; the budget lives in the Status block of `docs/auto-builder/TASKS.md` |
 | Change agent models/limits | Edit `model`, `maxTurns`, `tools` in `.claude/agents/<name>.md` ([fields](https://code.claude.com/docs/en/sub-agents)) |
 | Remove an agent | Delete its file; the lead performs that role itself |
 | Project facts | Keep short build/test commands and conventions in your project's `CLAUDE.md` |
@@ -194,6 +218,7 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │           ├── templates/
 │           │   ├── ARCHITECTURE.md
 │           │   ├── DECISIONS.md
+│           │   ├── PROGRESS.md
 │           │   ├── PROJECT.md
 │           │   ├── REQUIREMENTS.md
 │           │   ├── TASKS.md
@@ -206,8 +231,53 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │           │   └── verification.md
 │           └── SKILL.md
 ├── .github/
-│   └── workflows/
-│       └── validate.yml
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.yml
+│   │   ├── config.yml
+│   │   └── feature_request.yml
+│   ├── workflows/
+│   │   └── validate.yml
+│   └── PULL_REQUEST_TEMPLATE.md
+├── docs/
+│   ├── assets/
+│   │   ├── favicon.svg
+│   │   ├── og-image.png
+│   │   ├── site.js
+│   │   └── style.css
+│   ├── .nojekyll
+│   ├── 404.html
+│   ├── architecture.html
+│   ├── faq.html
+│   ├── features.html
+│   ├── index.html
+│   ├── installation.html
+│   ├── robots.txt
+│   ├── sitemap.xml
+│   └── usage.html
+├── launch/
+│   ├── README.md
+│   ├── announcement.md
+│   ├── community-posts.md
+│   ├── devto-tutorial.md
+│   ├── github-metadata.md
+│   ├── launch-checklist.md
+│   ├── merge-and-publication-checklist.md
+│   ├── release-notes-v1.0.0.md
+│   ├── search-console.md
+│   ├── seo-strategy.md
+│   └── social-preview-spec.md
+├── site/
+│   ├── pages/
+│   │   ├── 404.html
+│   │   ├── architecture.html
+│   │   ├── faq.html
+│   │   ├── features.html
+│   │   ├── index.html
+│   │   ├── installation.html
+│   │   └── usage.html
+│   ├── build.py
+│   ├── check.py
+│   └── og-image.html
 ├── tests/
 │   ├── test-install.sh
 │   └── validate.py
@@ -217,6 +287,7 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 ├── CONTRIBUTING.md
 ├── LICENSE
 ├── README.md
+├── SECURITY.md
 ├── install.ps1
 └── install.sh
 ```
@@ -238,11 +309,11 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 
 A live, end-to-end `/auto-builder` run has **not** been performed. Partial evidence: Claude Code's agent registry listed the eight project agents once they existed in `.claude/agents/`.
 
-The checks (`python3 -I tests/validate.py`, `bash tests/test-install.sh`) pass on Linux locally; a GitHub Actions workflow is included but has not run yet. **Not verified:** a live `/auto-builder` run inside Claude Code, and `install.ps1` on Windows. Please report issues.
+The checks (`python3 -I tests/validate.py`, `bash tests/test-install.sh`) pass on Linux locally; the GitHub Actions workflow passed on GitHub for PR #1 and on `main` (Linux runner; static validation and installer tests only, not a live Claude Code run). **Not verified:** a live `/auto-builder` run inside Claude Code, and `install.ps1` on Windows. Please report issues.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report bugs and ideas through the [issue templates](https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/issues/new/choose); report security problems per [SECURITY.md](SECURITY.md). Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

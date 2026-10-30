@@ -1,0 +1,44 @@
+<h1>AUTO-BUILDER FAQ</h1>
+<p class="lead">Plain answers, including the limitations.</p>
+
+<details><summary>What is AUTO-BUILDER?</summary>
+<p>An open-source Claude Code skill (<code>/auto-builder</code>) with eight subagents that runs a structured development lifecycle from a high-level goal: discovery, requirements, architecture, planning, implementation, verification, review and delivery. See the <a href="features.html">features</a>.</p></details>
+
+<details><summary>Is it an official Anthropic product?</summary>
+<p>No. It is an independent community project and is not affiliated with or endorsed by Anthropic. The engineering practices it draws on (plan before coding, verify, delegate to subagents, keep project context in files) are inspirations from public guidance, not endorsements.</p></details>
+
+<details><summary>Which tools does it work with?</summary>
+<p>Claude Code only. It uses Claude Code skills and subagents. Other coding assistants are not supported.</p></details>
+
+<details><summary>Will it work unattended or in the background?</summary>
+<p>No. It runs inside your Claude Code session and stops at defined checkpoints. It does not run after the session ends, and because it is explicit-invoke only, scheduled or looped re-entry will not start it.</p></details>
+
+<details><summary>Can it push code, deploy, or spend money without asking?</summary>
+<p>Its instructions say it must ask first before deployments, spending, destructive data operations, exposing secrets, pushing, opening pull requests or changing product direction, and it never asks to bypass permissions. These are instructions to the model, not hard guarantees. Use Claude Code permissions and sandboxing as the enforcement layer and review the diff.</p></details>
+
+<details><summary>Does it change my git history?</summary>
+<p>It works on a new <code>auto-builder/&lt;slug&gt;</code> branch and makes local checkpoint commits by explicit path. It is instructed not to rewrite history, force-push or commit your uncommitted changes. Tell it you don't want a work branch to skip that step.</p></details>
+
+<details><summary>How much does it cost?</summary>
+<p>AUTO-BUILDER itself is free under the Apache-2.0 license. A run uses your normal Claude Code usage and subagents add to it. There is no cost estimate here because none has been measured.</p></details>
+
+<details><summary>How is it different from just prompting Claude Code?</summary>
+<p>It packages a repeatable process: a plan and acceptance criteria before code, a persistent task file that survives compaction, milestone gates with recorded evidence, bounded fix loops with root-cause analysis, independent review at meaningful milestones, least-privilege subagents and git rules. Whether that yields better results for your project is for you to judge; no benchmarks are claimed.</p></details>
+
+<details id="limitations"><summary>What are the known limitations?</summary>
+<ul>
+<li>Not yet validated end-to-end in live Claude Code sessions.</li>
+<li><code>install.ps1</code> has not been executed on Windows by the author.</li>
+<li>The reviewer and QA agents have Bash, which cannot be technically restricted; they are instructed to be read-only.</li>
+<li>The optional secret-protection hook does not cover Bash commands or Read.</li>
+<li>Worktree isolation behaviour for parallel agents is not verified.</li>
+<li>Foreground permission prompts can pause a run unless you pre-allow your commands.</li>
+</ul></details>
+
+<details><summary>Does it support Windows?</summary>
+<p>A PowerShell installer is provided but untested by the author. The optional hook scripts and the template helper are bash, so use Git Bash or WSL for them.</p></details>
+
+<details><summary>What licence is it under, and can I contribute?</summary>
+<p>Apache-2.0. Contributions are welcome; see <a href="{{GH}}/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> and open an issue for larger changes.</p></details>
+
+<p>Ready to try it? <a href="installation.html">Install AUTO-BUILDER</a>.</p>
