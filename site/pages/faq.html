@@ -2,7 +2,7 @@
 <p class="lead">Plain answers, including the limitations.</p>
 
 <details><summary>What is AUTO-BUILDER?</summary>
-<p>An open-source Claude Code skill (<code>/auto-builder</code>) with eight subagents that runs a structured development lifecycle from a high-level goal: discovery, requirements, architecture, planning, implementation, verification, review and delivery. See the <a href="features.html">features</a>.</p></details>
+<p>An open-source Claude Code skill (<code>/auto-builder</code>) with nine subagents that runs a structured development lifecycle from a high-level goal: discovery, requirements, architecture, planning, implementation, verification, review and delivery. See the <a href="features.html">features</a>.</p></details>
 
 <details><summary>Is it an official Anthropic product?</summary>
 <p>No. It is an independent community project and is not affiliated with or endorsed by Anthropic. The engineering practices it draws on (plan before coding, verify, delegate to subagents, keep project context in files) are inspirations from public guidance, not endorsements.</p></details>
@@ -31,6 +31,7 @@
 <li><code>install.ps1</code> has not been executed on Windows by the author.</li>
 <li>The reviewer and QA agents have Bash, which cannot be technically restricted; they are instructed to be read-only.</li>
 <li>The optional secret-protection hook does not cover Bash commands or Read.</li>
+<li>The security agent is an instruction-driven reviewer, not a scanner or a guarantee: it can miss vulnerabilities, and a project is never reported as "secure".</li>
 <li>Worktree isolation behaviour for parallel agents is not verified.</li>
 <li>Foreground permission prompts can pause a run unless you pre-allow your commands.</li>
 </ul></details>

@@ -2,10 +2,10 @@
 
 [![validate](https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/actions/workflows/validate.yml/badge.svg)](https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/actions/workflows/validate.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-![Claude Code skill](https://img.shields.io/badge/Claude%20Code-skill%20%2B%208%20subagents-0b5fff)
+![Claude Code skill](https://img.shields.io/badge/Claude%20Code-skill%20%2B%209%20subagents-0b5fff)
 ![Status](https://img.shields.io/badge/status-early%20release-orange)
 
-**AUTO-BUILDER** is an open-source [Claude Code skill](https://code.claude.com/docs/en/skills) plus eight specialist [subagents](https://code.claude.com/docs/en/sub-agents) for goal-driven autonomous development. Give `/auto-builder` a goal; it runs an AI software development workflow (discovery, requirements, architecture, planning, implementation, independent verification, iteration and delivery) and only stops to ask you at consequential checkpoints.
+**AUTO-BUILDER** is an open-source [Claude Code skill](https://code.claude.com/docs/en/skills) plus nine specialist [subagents](https://code.claude.com/docs/en/sub-agents) for goal-driven autonomous development. Give `/auto-builder` a goal; it runs an AI software development workflow (discovery, requirements, architecture, planning, implementation, independent verification, iteration and delivery) and only stops to ask you at consequential checkpoints.
 
 **Website and docs:** <https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/> (features, installation, usage tutorial, architecture, FAQ)
 
@@ -56,16 +56,19 @@ flowchart TD
       BE[backend-engineer]
       AI[ai-engineer]
       QA[qa-engineer]
+      SE[security-engineer]
       CR[critical-reviewer]
     end
     P1 -.-> RS
     P2 -.-> PM
-    P3 -.-> AR
+    P3 -.-> AR & SE
     P5 -.-> FE & BE & AI
-    P6 -.-> QA & CR
+    P6 -.-> QA & SE & CR
 ```
 
 **Quality protocol.** Work proceeds in milestones that each pass a verification gate (tests, regression checks, evidence, updated state files) before the next starts. A separate reviewer is used at meaningful milestones and for a final review; every criterion is reported as Verified, Partially verified or Untested; failures are root-caused and capped at three attempts. This is an instruction system for the model, not a guarantee of defect-free software.
+
+**Security gate.** For projects that handle authentication, user data, payments, external APIs, file uploads, secrets, integrations or AI tools, `security-engineer` threat-models the design, reviews security-relevant milestones and does a final review before completion, independently of `qa-engineer` and `critical-reviewer`. A Critical finding blocks completion and cannot be accepted; a High finding must be fixed or explicitly accepted by you, and an accepted High stays recorded as open residual risk, never as fixed; Medium and Low findings are tracked. Reports say which method was used (static inspection, automated scanning, or penetration testing, which is not performed unless authorized). Trivial projects get a short checklist instead. A clean scan is never reported as "secure".
 
 The lead agent (your main Claude Code session) owns integration. Subagents get a precise brief and report back; they start without your conversation and cannot ask you questions. They share your working tree unless you opt into worktree isolation, so file ownership is assigned explicitly and only the lead commits. Project memory lives in files under `docs/auto-builder/` in your project, not in the conversation.
 
@@ -80,9 +83,10 @@ The lead agent (your main Claude Code session) owns integration. Subagents get a
 | `backend-engineer` | APIs, databases, integrations, pipelines | yes (assigned files) |
 | `ai-engineer` | LLM/RAG/agents/evals/ML pipelines | yes (assigned files) |
 | `qa-engineer` | Independent test runs, edge-case probing, proposes tests | no |
+| `security-engineer` | Threat modeling, security review, fix verification (OWASP, authn/authz, injection, XSS/CSRF/SSRF, secrets, dependencies, data privacy, AI/LLM security) | no (reports) |
 | `critical-reviewer` | Adversarial review of plans and diffs | no |
 
-Read-only status: `architect`, `product-manager`, `researcher` and `qa-engineer` have no Edit/Write tools. `critical-reviewer` and `qa-engineer` also have Bash to run checks, which Claude Code cannot restrict by argument, so they are *instructed* not to modify files rather than technically prevented. `researcher` and `product-manager` can fetch web pages, so treat fetched content as untrusted.
+Read-only status: `architect`, `product-manager`, `researcher`, `qa-engineer` and `security-engineer` have no Edit/Write tools, and `critical-reviewer` has them denied. `critical-reviewer`, `qa-engineer` and `security-engineer` also have Bash to run checks, which Claude Code cannot restrict by argument, so they are *instructed* not to modify files or run destructive tests rather than technically prevented. `security-engineer` has no web tools. `researcher` and `product-manager` can fetch web pages, so treat fetched content as untrusted.
 
 Rules: spawn only what the task needs; parallelise only independent work; never let two agents edit the same file ([details](.claude/skills/auto-builder/references/parallel-work.md)).
 
@@ -199,7 +203,8 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │   │   ├── frontend-engineer.md
 │   │   ├── product-manager.md
 │   │   ├── qa-engineer.md
-│   │   └── researcher.md
+│   │   ├── researcher.md
+│   │   └── security-engineer.md
 │   └── skills/
 │       └── auto-builder/
 │           ├── examples/
@@ -221,6 +226,7 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │           │   ├── PROGRESS.md
 │           │   ├── PROJECT.md
 │           │   ├── REQUIREMENTS.md
+│           │   ├── SECURITY-REVIEW.md
 │           │   ├── TASKS.md
 │           │   └── TESTING.md
 │           ├── workflows/
@@ -228,6 +234,7 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │           │   ├── discovery.md
 │           │   ├── implementation.md
 │           │   ├── planning.md
+│           │   ├── security.md
 │           │   └── verification.md
 │           └── SKILL.md
 ├── .github/
@@ -307,7 +314,7 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 
 ## Verification status
 
-A live, end-to-end `/auto-builder` run has **not** been performed. Partial evidence: Claude Code's agent registry listed the eight project agents once they existed in `.claude/agents/`.
+A live, end-to-end `/auto-builder` run has **not** been performed. Partial evidence: Claude Code's agent registry listed the project agents once they existed in `.claude/agents/`.
 
 The checks (`python3 -I tests/validate.py`, `bash tests/test-install.sh`) pass on Linux locally; the GitHub Actions workflow passed on GitHub for PR #1 and on `main` (Linux runner; static validation and installer tests only, not a live Claude Code run). **Not verified:** a live `/auto-builder` run inside Claude Code, and `install.ps1` on Windows. Please report issues.
 

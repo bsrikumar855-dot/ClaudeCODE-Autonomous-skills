@@ -28,11 +28,11 @@ OG_IMAGE = BASE + "assets/og-image.png"
 PAGES = {
     "index": (
         "AUTO-BUILDER: Autonomous Coding Agent Skill for Claude Code",
-        "Open-source Claude Code skill with eight subagents: turn a goal into a planned, built, tested and independently reviewed project, with approval checkpoints.",
+        "Open-source Claude Code skill with nine subagents: turn a goal into a planned, built, tested and independently reviewed project, with approval checkpoints.",
         "Home", "1.0"),
     "features": (
         "Features: Claude Code Subagents & Autonomous Workflow",
-        "Nine-step autonomous development lifecycle, eight Claude Code subagents, independent review, approval checkpoints, safe installers and optional hooks.",
+        "Nine-step autonomous development lifecycle, nine Claude Code subagents, independent review, approval checkpoints, safe installers and optional hooks.",
         "Features", "0.8"),
     "installation": (
         "Install AUTO-BUILDER: Claude Code Skill Setup Guide",
@@ -44,7 +44,7 @@ PAGES = {
         "Usage", "0.8"),
     "architecture": (
         "Architecture: Claude Code Subagents & Dev Lifecycle",
-        "How AUTO-BUILDER works: the lead agent, eight specialist subagents, state files, parallel-work rules, approval policy and the verify-and-review loop.",
+        "How AUTO-BUILDER works: the lead agent, nine specialist subagents, state files, parallel-work rules, approval policy and the verify-and-review loop.",
         "Architecture", "0.7"),
     "faq": (
         "AUTO-BUILDER FAQ: Autonomous Claude Code Questions",
@@ -81,18 +81,18 @@ def repo_facts():
 
 
 ROLE_ORDER = ["product-manager", "researcher", "architect", "frontend-engineer",
-              "backend-engineer", "ai-engineer", "qa-engineer", "critical-reviewer"]
+              "backend-engineer", "ai-engineer", "qa-engineer", "security-engineer", "critical-reviewer"]
 
 PHASE_SUMMARY = {
     "0": "Inspect the repository, git state, conventions and the commands that build, test and lint it.",
     "1": "Frame the real problem and users, research where facts matter, compare approaches, recommend one.",
     "2": "Write testable requirements, user journeys and acceptance criteria.",
-    "3": "Choose the stack, design components, data and APIs, and record trade-offs.",
-    "4": "Define measurable acceptance criteria and milestones with verification gates in a persistent task file, with a per-milestone iteration budget.",
+    "3": "Choose the stack, design components, data and APIs, and record trade-offs; threat-model security-sensitive designs.",
+    "4": "Define measurable acceptance criteria and milestones with verification gates in a persistent task file, with a per-milestone iteration budget; add security controls where risk warrants.",
     "5": "Build one milestone at a time as vertical slices on a work branch; the lead commits only after the milestone passes its gate.",
     "6": "Run the milestone gate: tests, linters and regression checks, real user flows, then an independent review at meaningful checkpoints.",
     "7": "Repeat plan, build, test, review, fix per milestone, with root-cause analysis of failures, until the completion standard is met or a blocker needs you.",
-    "8": "Report what was built and, per criterion, what is verified, partially verified or untested, whether review was independent, and what you must do next.",
+    "8": "Report what was built and, per criterion, what is verified, partially verified or untested, whether review was independent, the security status, and what you must do next.",
 }
 
 
@@ -106,7 +106,7 @@ def agent_table(agents):
             f"<tr><th scope=\"row\"><code>{html.escape(n)}</code></th>"
             f"<td>{html.escape(a['description'])}</td>"
             f"<td>{html.escape(', '.join(a['tools']))}</td><td>{edit}</td></tr>")
-    return ('<div class="table-wrap"><table><caption>The eight AUTO-BUILDER subagents (generated from '
+    return ('<div class="table-wrap"><table><caption>The nine AUTO-BUILDER subagents (generated from '
             '<code>.claude/agents/</code>)</caption><thead><tr><th scope="col">Agent</th>'
             '<th scope="col">Responsibility</th><th scope="col">Tools</th>'
             '<th scope="col">Can edit files</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table></div>")
@@ -234,7 +234,7 @@ def render(slug, fragment, agents, version, phases):
 
 def main():
     agents, version, phases = repo_facts()
-    assert len(agents) == 8 and len(phases) == 9, (len(agents), len(phases))
+    assert len(agents) == 9 and len(phases) == 9, (len(agents), len(phases))
     os.makedirs(os.path.join(OUT, "assets"), exist_ok=True)
     for slug in PAGES:
         frag = open(os.path.join(PAGES_DIR, slug + ".html"), encoding="utf-8").read()

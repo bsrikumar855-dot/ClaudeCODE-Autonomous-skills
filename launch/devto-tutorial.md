@@ -8,7 +8,7 @@ cover_image: https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/ass
 
 > Disclosure: I'm the author of AUTO-BUILDER. It's an independent, early-release open-source project (Apache-2.0), not affiliated with Anthropic.
 
-Autonomous coding agents often skip planning, trust their own output, and stop after one green build. **AUTO-BUILDER** is a Claude Code skill with eight subagents that wraps a coding session in a repeatable process. This tutorial installs it and walks through a first run.
+Autonomous coding agents often skip planning, trust their own output, and stop after one green build. **AUTO-BUILDER** is a Claude Code skill with nine subagents that wraps a coding session in a repeatable process. This tutorial installs it and walks through a first run.
 
 ## 1. Install
 
@@ -21,7 +21,7 @@ cd ClaudeCODE-Autonomous-skills
 
 On Windows use `.\install.ps1 -Project -Path C:\path\to\repo` (note: the PowerShell installer hasn't been executed by the author yet). The installer never overwrites your files unless you pass `--update`.
 
-Check that `.claude/skills/auto-builder/SKILL.md` and eight files in `.claude/agents/` exist, then start a new Claude Code session in that repo.
+Check that `.claude/skills/auto-builder/SKILL.md` and nine files in `.claude/agents/` exist, then start a new Claude Code session in that repo.
 
 ## 2. Pick a small goal
 

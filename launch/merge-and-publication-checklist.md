@@ -1,7 +1,7 @@
 # Merge and publication checklist
 
 State when written (2026-10-30), verified from git and the GitHub API:
-- `feat/auto-builder` was merged on GitHub as PR #1 (merge commit `7b9d42d`); `origin/main` already contains the AUTO-BUILDER skill, 8 agents, installers, hooks and tests, and its tree is identical to `feat/auto-builder`.
+- `feat/auto-builder` was merged on GitHub as PR #1 (merge commit `7b9d42d`); `origin/main` already contains the AUTO-BUILDER skill, its subagents, installers, hooks and tests, and its tree is identical to `feat/auto-builder`.
 - `feat/launch-seo` is based on `56ce411` (the head of PR #1, an ancestor of `main`). **It has no commits of its own: all launch work is uncommitted in the working tree.** The launch changes apply cleanly to `origin/main` (checked with `git apply --check`; `main` has no changes to the four modified files).
 - The repository has no description, homepage or topics, and GitHub Pages is **not enabled** (`has_pages: false`).
 - The CI workflow ran and passed on GitHub for PR #1 and for the merge to `main` (original two-step version).

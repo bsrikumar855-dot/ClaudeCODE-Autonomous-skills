@@ -22,6 +22,7 @@ Copy into the milestone's row in `TASKS.md` and tick only what actually happened
 - [ ] Lint / type check / build run where the project has them
 - [ ] Regression checks re-run (earlier tests still pass); changed files reviewed via `git diff --stat` and the diff
 - [ ] Independent review done if required (or "not independent" disclosed)
+- [ ] Security gate run if this milestone is in scope (see security.md): no open Critical; every High fixed or user-accepted; Medium/Low tracked
 - [ ] Each acceptance criterion marked Verified / Partially verified / Untested with evidence
 - [ ] `TASKS.md`, `PROGRESS.md`, `DECISIONS.md`, `TESTING.md` updated
 - [ ] No open blocker or major finding

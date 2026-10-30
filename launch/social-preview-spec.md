@@ -18,7 +18,7 @@ GitHub shows this image when the repo is linked on social platforms. It is uploa
 | Logo mark | 84 px rounded square, `#0b5fff`, white "AB" |
 | Headline | "AUTO-BUILDER", 84 px bold, white |
 | Subhead | "Goal-driven autonomous development skill for Claude Code", 40 px, `#d6e2ff` |
-| Chips | `/auto-builder` · `8 subagents` · `Plan · Build · Verify` |
+| Chips | `/auto-builder` · `9 subagents` · `Plan · Build · Verify` |
 | Footer | repository path and "Apache-2.0", 24 px |
 | Contrast | all text ≥ 7:1 against its background |
 | Don'ts | No Anthropic/Claude logos or marks, no star counts, no performance claims |

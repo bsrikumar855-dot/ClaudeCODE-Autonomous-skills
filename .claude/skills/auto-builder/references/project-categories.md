@@ -19,3 +19,4 @@ Identify the category (a project may span several), then apply the matching emph
 - Reuse the repository's stack. In an empty repo choose mainstream, well-documented tools you can verify locally.
 - Side effects on real systems (writes, sends, deploys, spend) are off by default and gated behind a dry-run or explicit approval.
 - Anything stochastic (LLMs, ML) needs a measurable evaluation, not "looks good".
+- Projects handling authentication, user data, payments, external APIs, file uploads, secrets, integrations or AI tools with side effects fall under the Security gate (`security-engineer`; see workflows/security.md). Lead agents above are in addition to it.

@@ -6,12 +6,13 @@
 
 ## AUTO-BUILDER v1.0.0
 
-AUTO-BUILDER is an open-source Claude Code skill plus eight specialist subagents for goal-driven autonomous development. Run `/auto-builder <goal>`; it plans, builds, verifies, independently reviews and documents the work, pausing only at consequential checkpoints.
+AUTO-BUILDER is an open-source Claude Code skill plus nine specialist subagents for goal-driven autonomous development. Run `/auto-builder <goal>`; it plans, builds, verifies, independently reviews and documents the work, pausing only at consequential checkpoints.
 
 ### Highlights
 - **`/auto-builder` skill** with a nine-step lifecycle (Phase 0–8): reconnaissance, discovery, product definition, architecture, execution planning, implementation, independent verification, bounded iteration, delivery.
-- **Eight subagents** with least-privilege tools: product-manager, researcher, architect, frontend-engineer, backend-engineer, ai-engineer, qa-engineer, critical-reviewer.
+- **Nine subagents** with least-privilege tools: product-manager, researcher, architect, frontend-engineer, backend-engineer, ai-engineer, qa-engineer, security-engineer, critical-reviewer.
 - **Quality protocol:** milestones with verification gates, independent review at meaningful checkpoints, Verified / Partially verified / Untested evidence labels, root-cause failure recovery and a completion standard. These are instructions to the model, not guarantees.
+- **Security gate:** for projects with security risk, a read-only `security-engineer` threat-models the design, reviews security-relevant milestones and does a final review. Critical findings block completion and cannot be accepted; High findings need a fix or the user's explicit acceptance, recorded as open residual risk (never as fixed); reports state whether they rest on static inspection, automated scanning or penetration testing. Never reported as "secure"; instructions, not guarantees.
 - **Persistent state** in `docs/auto-builder/` (task status and milestone gates, acceptance checklist with evidence, decisions, progress log) and a resume protocol for long runs.
 - **Approval policy:** asks before destructive data operations, deploys, spending, secrets, pushing or direction changes.
 - **Git behaviour:** work branch, lead-only checkpoint commits by explicit path, never commits your uncommitted changes, never pushes.

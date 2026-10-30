@@ -33,7 +33,30 @@ KNOWN_TOOLS = {
 EXPECTED_AGENTS = {
     "product-manager", "researcher", "architect", "frontend-engineer",
     "backend-engineer", "ai-engineer", "qa-engineer", "critical-reviewer",
+    "security-engineer",
 }
+# Least-privilege snapshot: (tools, disallowedTools, a keyword that must stay in the description).
+# The first eight entries pin the originally shipped restrictions and responsibilities.
+EXPECTED_AGENT_SPEC = {
+    "product-manager": ({"Read", "Grep", "Glob", "WebSearch", "WebFetch"}, set(), "acceptance criteria"),
+    "researcher": ({"Read", "Grep", "Glob", "WebSearch", "WebFetch"}, set(), "primary sources"),
+    "architect": ({"Read", "Grep", "Glob"}, set(), "architecture"),
+    "frontend-engineer": ({"Read", "Edit", "Write", "Bash", "Grep", "Glob"}, set(), "frontend"),
+    "backend-engineer": ({"Read", "Edit", "Write", "Bash", "Grep", "Glob"}, set(), "backend"),
+    "ai-engineer": ({"Read", "Edit", "Write", "Bash", "Grep", "Glob", "WebSearch", "WebFetch"}, set(), "LLM"),
+    "qa-engineer": ({"Read", "Bash", "Grep", "Glob"}, {"Edit", "Write"}, "test"),
+    "critical-reviewer": ({"Read", "Grep", "Glob", "Bash"}, {"Edit", "Write"}, "reviews"),
+    "security-engineer": ({"Read", "Bash", "Grep", "Glob"}, {"Edit", "Write", "WebFetch", "WebSearch"}, "security"),
+}
+SECURITY_AGENT_TOPICS = [
+    "threat model", "attack surface", "owasp", "authentication", "authorization", "api security",
+    "sql", "injection", "xss", "csrf", "ssrf", "secrets", "dependenc", "database", "privacy",
+    "file upload", "input validation", "deployment", "prompt injection", "insecure tool execution",
+    "data leakage", "excessive", "regression", "critical", "high", "medium", "low", "confirmed",
+    "potential", "[redacted]", "destructive", "production", "paid", "evidence", "never claim",
+    "not technically restricted", "network", "npm audit", "you specify", "keeps blocking",
+    "static inspection", "automated scanning", "penetration", "not performed", "can never be accepted", "open residual risk",
+]
 EXPECTED_DIRS = ["workflows", "principles", "templates", "scripts", "references"]
 SECRET_PATTERNS = [
     (r"sk-[A-Za-z0-9]{20,}", "API-key-like string"),
@@ -168,11 +191,19 @@ def check_agents():
         if "maxTurns" in fm:
             ok(fm["maxTurns"].isdigit() and int(fm["maxTurns"]) > 0, f"{rel(path)}: maxTurns must be a positive number")
         ok("Agent" not in fm.get("tools", ""), f"{rel(path)}: nested spawning not intended")
-        if name in ("critical-reviewer", "architect", "product-manager", "researcher", "qa-engineer"):
+        if name in EXPECTED_AGENT_SPEC:
+            want_tools, want_deny, kw = EXPECTED_AGENT_SPEC[name]
+            have_tools = {t.strip() for t in fm.get("tools", "").split(",") if t.strip()}
+            have_deny = {t.strip() for t in fm.get("disallowedTools", "").split(",") if t.strip()}
+            ok(have_tools == want_tools, f"{rel(path)}: tools changed: {sorted(have_tools)} != {sorted(want_tools)}")
+            ok(have_deny == want_deny, f"{rel(path)}: disallowedTools changed: {sorted(have_deny)} != {sorted(want_deny)}")
+            ok(kw.lower() in fm.get("description", "").lower(), f"{rel(path)}: description lost responsibility keyword '{kw}'")
+        if name in ("critical-reviewer", "architect", "product-manager", "researcher", "qa-engineer", "security-engineer"):
             ok("Edit" not in fm.get("tools", "") and "Write" not in fm.get("tools", ""),
                f"{rel(path)}: reviewer/read-only role must not have Edit/Write")
     names = [n for n in found]
     ok(len(names) == len(set(names)), "duplicate agent names")
+    ok(len(found) == 9 and len(EXPECTED_AGENTS) == 9, f"exactly nine specialist agents required, found {len(found)}")
     ok(found == EXPECTED_AGENTS, f"agents mismatch: missing={EXPECTED_AGENTS - found} extra={found - EXPECTED_AGENTS}")
 
 
@@ -250,11 +281,11 @@ def check_protocol():
         ok(phrase in verification, f"workflows/verification.md missing '{phrase}'")
     # State files named in SKILL.md == templates shipped
     line = next((l for l in skill.splitlines() if l.startswith("`PROJECT.md`")), "")
-    named = set(re.findall(r"`([A-Z]+\.md)`", line))
+    named = set(re.findall(r"`([A-Z-]+\.md)`", line))
     shipped = {f for f in os.listdir(os.path.join(SKILL_DIR, "templates")) if f.endswith(".md")}
     ok(named == shipped, f"state files in SKILL.md vs templates differ: {named ^ shipped}")
     ok("PROGRESS.md" in shipped, "missing PROGRESS.md template")
-    # All eight agents referenced by SKILL.md and none invented
+    # All nine agents referenced by SKILL.md and none invented
     ref = set(re.findall(r"\| `([a-z-]+)` \|", skill))
     ok(ref == EXPECTED_AGENTS, f"agents in SKILL.md table differ from shipped: {ref ^ EXPECTED_AGENTS}")
     # Optional hooks must stay off by default: no shipped settings, installers never write settings
@@ -281,6 +312,77 @@ def check_protocol():
                         ok(False, f".github/{f}: invalid YAML: {str(e).splitlines()[0]}")
     except ImportError:
         pass
+
+
+def check_security():
+    """The security-engineer agent and the Security gate must exist and be wired into the lifecycle."""
+    path = os.path.join(AGENT_DIR, "security-engineer.md")
+    if not ok(os.path.isfile(path), "missing .claude/agents/security-engineer.md"):
+        return
+    body = open(path, encoding="utf-8").read().lower()
+    for topic in SECURITY_AGENT_TOPICS:
+        ok(topic in body, f"security-engineer.md missing topic/rule: '{topic}'")
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    gate = section(skill, "Security gate", "##")
+    if ok(bool(gate), "SKILL.md: missing '## Security gate' section"):
+        g = gate.lower()
+        for phrase in ("cannot be accepted", "potential", "never marked fixed", "residual risk", "static inspection",
+                       "automated scanning", "penetration testing", "not performed", "single source of truth", "same pass", "never consume the pass budget", "ask for acceptance once",
+                       "potential", "decisions.md", "not independent", "unaccepted high blocks", "no user present",
+                       "critical", "high", "medium", "low", "blocks", "residual risk", "explicit", "3-attempt",
+                       "incomplete", "never silently ignore", "not required", "security-engineer", "architect",
+                       "qa-engineer", "critical-reviewer", "re-check", "never \"secure\"", "threat model"):
+            ok(phrase in g, f"Security gate missing '{phrase}'")
+    wired = {"Phase 3": "security-engineer", "Phase 4": "security gate", "Phase 6": "security gate", "Phase 8": "security status"}
+    for ph, needle in wired.items():
+        body_ph = re.search(rf"^### {ph} .*?$(.*?)(?=^#{{2,3}} |\Z)", skill, flags=re.S | re.M)
+        ok(bool(body_ph) and needle in body_ph.group(1).lower(), f"SKILL.md {ph} not connected to the security gate ('{needle}')")
+    qp = section(skill, "Quality protocol", "##").lower()
+    ok("security gate" in qp.split("7. **completion standard")[-1], "completion standard must include the Security gate")
+    ok("security-engineer" in skill and "workflows/security.md" in skill, "SKILL.md must reference security-engineer and the security playbook")
+    approval = section(skill, "Approval policy", "##").lower()
+    ok("high security finding" in approval, "Approval policy must list accepting a High security finding as ask-first")
+    ok(os.path.isfile(os.path.join(SKILL_DIR, "workflows", "security.md")), "missing workflows/security.md")
+    sec = open(os.path.join(SKILL_DIR, "workflows", "security.md"), encoding="utf-8").read().lower()
+    for phrase in ("static inspection", "automated scanning", "penetration", "not technically restricted", "never recorded as fixed",
+                   "architecture (phase 3)", "milestone gate (phase 6)", "before completion (phase 8)", "trivial",
+                   "security brief", "qa-engineer", "critical-reviewer", "ai/llm", "never write \"secure\"", "3-attempt"):
+        ok(phrase in sec, f"workflows/security.md missing '{phrase}'")
+    for f, needle in (("planning.md", "security-engineer"), ("implementation.md", "security regression"),
+                      ("verification.md", "security gate"), ("delivery.md", "security status")):
+        t = open(os.path.join(SKILL_DIR, "workflows", f), encoding="utf-8").read().lower()
+        ok(needle in t, f"workflows/{f} not updated for the security gate ('{needle}')")
+    tpl = os.path.join(SKILL_DIR, "templates", "SECURITY-REVIEW.md")
+    ok(os.path.isfile(tpl), "missing templates/SECURITY-REVIEW.md")
+    if os.path.isfile(tpl):
+        t = open(tpl, encoding="utf-8").read()
+        for h in ("Threat model", "Findings register", "Accepted residual risk", "Security gate status", "Methods used",
+                  "Accepted by user (residual risk)", "never recorded as Fixed", "Penetration"):
+            ok(h in t, f"SECURITY-REVIEW.md missing '{h}'")
+    ok("until confirmed and fixed, disproved with evidence, or accepted" not in (skill + open(path, encoding="utf-8").read()).lower(),
+       "a Potential Critical must never be acceptable (old 'or accepted' wording present)")
+    ok("a critical or high security finding" in skill.lower(), "blocker definition must say 'a Critical or High security finding' (Medium/Low must not block)")
+    # Limits stay consistent: only the 3-attempt and 5-pass bounds appear in the skill text
+    nums = set(re.findall(r"\b(\d+)(?:-attempt| (?:fix )?attempts| passes| iterations)", skill))
+    ok(nums <= {"3", "5"}, f"SKILL.md introduces other retry/iteration limits: {nums}")
+    ok(skill.count("default 5 passes per milestone") == 1 and skill.count("3 fix attempts") == 1,
+       "retry/iteration limits must each be defined exactly once in SKILL.md")
+    # Both installers discover agents by glob, so the ninth agent installs without special-casing
+    sh = open(os.path.join(ROOT, "install.sh"), encoding="utf-8").read()
+    ps = open(os.path.join(ROOT, "install.ps1"), encoding="utf-8").read()
+    ok('"$src_agents"/*.md' in sh and "security-engineer" not in sh, "install.sh must install agents by glob, not by name")
+    ok(bool(re.search(r"Get-ChildItem[^\n]*\$srcAgents[^\n]*-Filter \*\.md", ps)) and "security-engineer" not in ps, "install.ps1 must install agents by glob, not by name")
+    # No stale agent counts anywhere (docs, site, tests, launch kit)
+    stale = re.compile(r"\b(?:eight|8)\b(?: specialist| Claude Code| AUTO-BUILDER| project)? (?:sub)?agents?\b|"
+                       r"\beight (?:roles|files|agent)|\b8 (?:subagent|agent)|-eq 8\b", re.I)
+    for base, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d != ".git"]
+        for f in files:
+            if f == "validate.py" or not f.endswith((".md", ".html", ".py", ".sh", ".ps1", ".yml", ".json")):
+                continue
+            pth = os.path.join(base, f)
+            hits = [(n, l) for n, l in enumerate(open(pth, encoding="utf-8").read().splitlines(), 1) if stale.search(l)]
+            ok(not hits, f"{rel(pth)}: stale agent count at line {hits[0][0]}: {hits[0][1].strip()[:90]}" if hits else "")
 
 
 def check_hygiene():
@@ -312,6 +414,7 @@ def main():
     check_links()
     check_scripts()
     check_protocol()
+    check_security()
     check_hygiene()
     if errors:
         print(f"FAILED: {len(errors)} problem(s) in {checks} checks")
