@@ -2,7 +2,7 @@
 
 ## Description (≤350 characters; GitHub's field limit)
 ```
-Autonomous coding agent skill for Claude Code: /auto-builder plus 8 subagents plan, build, test, review and document a project from a goal, with approval checkpoints.
+Autonomous coding agent skill for Claude Code: /auto-builder plus 9 subagents plan, build, test, review and document a project from a goal, with approval checkpoints.
 ```
 
 ## Website
@@ -21,7 +21,7 @@ Settings → Pages → *Build and deployment* → Source: **Deploy from a branch
 ## Equivalent `gh` commands (NOT run; review before executing)
 ```bash
 gh repo edit bsrikumar855-dot/ClaudeCODE-Autonomous-skills \
-  --description "Autonomous coding agent skill for Claude Code: /auto-builder plus 8 subagents plan, build, test, review and document a project from a goal, with approval checkpoints." \
+  --description "Autonomous coding agent skill for Claude Code: /auto-builder plus 9 subagents plan, build, test, review and document a project from a goal, with approval checkpoints." \
   --homepage "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/" \
   --add-topic claude-code --add-topic claude-code-skills --add-topic claude-skills --add-topic agent-skills \
   --add-topic claude-code-subagents --add-topic subagents --add-topic autonomous-agents --add-topic ai-agents \

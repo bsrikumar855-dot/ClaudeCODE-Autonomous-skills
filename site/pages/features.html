@@ -1,6 +1,6 @@
 <h1>Features: an autonomous Claude Code workflow with guardrails</h1>
 <p class="lead">Everything below exists in the repository today. Nothing here is a benchmark or a performance claim.</p>
-<p class="toc">On this page: <a href="#lifecycle">Lifecycle</a> &middot; <a href="#quality">Quality protocol</a> &middot; <a href="#agents">Subagents</a> &middot; <a href="#safety">Safety controls</a> &middot; <a href="#categories">Project categories</a> &middot; <a href="#install">Installers</a> &middot; <a href="#hooks">Hooks</a></p>
+<p class="toc">On this page: <a href="#lifecycle">Lifecycle</a> &middot; <a href="#quality">Quality protocol</a> &middot; <a href="#security">Security gate</a> &middot; <a href="#agents">Subagents</a> &middot; <a href="#safety">Safety controls</a> &middot; <a href="#categories">Project categories</a> &middot; <a href="#install">Installers</a> &middot; <a href="#hooks">Hooks</a></p>
 
 <h2 id="lifecycle">Nine-step autonomous development lifecycle</h2>
 {{PHASE_LIST}}
@@ -18,10 +18,19 @@
 </ul>
 <p>This is an instruction system for the model, not a guarantee that the result is defect-free. Review the work yourself.</p>
 
-<h2 id="agents">Eight Claude Code subagents</h2>
+<h2 id="security">Security gate</h2>
+<p>For projects that handle authentication, user or personal data, payments, externally reachable APIs, file uploads, secrets, integrations or AI/LLM tools with side effects, the skill instructs the lead to involve <code>security-engineer</code>, a read-only, independent reviewer:</p>
+<ul>
+<li><strong>Architecture:</strong> a threat model for the design decisions the architect flags as security-sensitive.</li>
+<li><strong>Milestones:</strong> a security review of milestones that touch authentication, data access, input handling, integrations, secrets, deployment configuration or AI tool permissions.</li>
+<li><strong>Before completion:</strong> a final security review. Trivial projects get a short checklist instead of a forced review.</li>
+</ul>
+<p>Findings are rated Critical, High, Medium or Low, with file and line evidence, an exploitation scenario and a minimal fix. A <strong>Critical</strong> finding blocks completion and cannot be accepted. A <strong>High</strong> finding must be fixed or explicitly accepted by you; an accepted High stays recorded as open residual risk, never as fixed. Medium and Low findings are tracked. A finding counts as fixed only with evidence from a re-check. Reports state whether they rest on static inspection, automated scanning or penetration testing (not performed unless explicitly authorized), and a clean scanner run is never reported as "secure". The agent only reads and reports: it does not edit files, touch production, run destructive tests or access external targets, and these limits are instructions, not technical guarantees.</p>
+
+<h2 id="agents">Nine Claude Code subagents</h2>
 <p>Each subagent is a Markdown file in <code>.claude/agents/</code> with valid Claude Code frontmatter. Subagents start with no conversation history and cannot ask you questions, so the lead gives each a precise brief and integrates its output.</p>
 {{AGENT_TABLE}}
-<p>The reviewer and QA agent also have Bash to run checks. Claude Code cannot restrict Bash by argument, so they are <em>instructed</em>, not technically prevented, from modifying files.</p>
+<p>The reviewer, QA and security agents also have Bash to run checks. Claude Code cannot restrict Bash by argument, so they are <em>instructed</em>, not technically prevented, from modifying files.</p>
 
 <h2 id="safety">Safety and approval controls</h2>
 <ul>

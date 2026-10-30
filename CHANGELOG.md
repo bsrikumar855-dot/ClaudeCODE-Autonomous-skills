@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [0.1.0] - Unreleased
 
+### Added (security engineer)
+- **`security-engineer` agent** (9th specialist; read-only, Bash for non-destructive checks, no web tools): threat modeling, OWASP Top 10, authn/authz, API, injection, XSS/CSRF/SSRF, secrets, dependencies, database, privacy, uploads, deployment config, AI/LLM security, security regression tests; evidence-based findings rated Critical/High/Medium/Low.
+- **Security gate** in `SKILL.md` and `workflows/security.md`: risk-based invocation at architecture, relevant milestones and before completion; Critical blocks completion and cannot be accepted (a Potential Critical blocks the same way); High needs a fix or explicit user acceptance, and an accepted High stays recorded as open residual risk, never as fixed; Medium/Low tracked; never silently ignored; reports distinguish static inspection, automated scanning and penetration testing (not performed unless authorized); no "secure" claims.
+- `SECURITY-REVIEW.md` template; planning, implementation, verification and delivery playbooks updated; validator and installer tests cover the nine-agent set and the gate.
+- Existing agent definitions and tool restrictions unchanged; retry/iteration/completion limits unchanged (3 attempts, 5 passes per milestone).
+
 ### Added (autonomous QA protocol)
 - **Quality protocol** in `SKILL.md`: measurable acceptance criteria, milestone verification gates, independent review at meaningful milestones (with a "not independent" disclosure), Verified / Partially verified / Untested evidence states, regression prevention, root-cause failure recovery, and an explicit completion standard.
 - `PROGRESS.md` template; `TASKS.md` template gains a milestone gate table and per-criterion states; verification, planning, implementation and delivery playbooks updated; reviewer brief template.
@@ -18,7 +24,7 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ### Added
 - `/auto-builder` skill (`.claude/skills/auto-builder/`) implementing a nine-step (Phase 0–8) autonomous development lifecycle with explicit approval checkpoints.
-- Eight specialist subagents in `.claude/agents/`: product-manager, researcher, architect, frontend-engineer, backend-engineer, ai-engineer, qa-engineer, critical-reviewer.
+- Nine specialist subagents in `.claude/agents/`: product-manager, researcher, architect, frontend-engineer, backend-engineer, ai-engineer, qa-engineer, security-engineer, critical-reviewer.
 - Workflow playbooks, project-category guide, parallel-work guide, and state-file templates.
 - Opt-in hook scripts: `protect-secrets.sh` (PreToolUse) and `verify-on-stop.sh` (Stop).
 - Installers for Unix (`install.sh`) and Windows (`install.ps1`) with `--dry-run`, existing-file preservation and `--update`.

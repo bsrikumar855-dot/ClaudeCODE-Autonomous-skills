@@ -18,7 +18,10 @@ nt() { local d="$1"; shift; n=$((n+1))
 home="$tmp/home"; mkdir -p "$home"
 HOME="$home" "$repo/install.sh" --personal >"$tmp/out1" 2>&1
 t "personal: SKILL.md installed"         test -f "$home/.claude/skills/auto-builder/SKILL.md"
-t "personal: 8 agents installed"         test "$(ls "$home/.claude/agents" | wc -l)" -eq 8
+n_agents="$(ls "$repo/.claude/agents"/*.md | wc -l)"
+t "repo ships exactly nine agents"        test "$n_agents" -eq 9
+t "personal: all nine agents installed"  test "$(ls "$home/.claude/agents" | wc -l)" -eq "$n_agents"
+t "personal: security-engineer installed" test -f "$home/.claude/agents/security-engineer.md"
 t "personal: hook script stays executable" test -x "$home/.claude/skills/auto-builder/scripts/hooks/protect-secrets.sh"
 t "personal: templates installed"        test -f "$home/.claude/skills/auto-builder/templates/TASKS.md"
 t "personal: no settings/CLAUDE.md written" bash -c "! ls '$home/.claude/settings.json' '$home/.claude/CLAUDE.md' 2>/dev/null"
@@ -44,7 +47,9 @@ t "update: backup kept"      grep -q "MY CUSTOM ARCHITECT" "$home/.claude/agents
 proj="$tmp/my project"; mkdir -p "$proj"
 ( cd "$tmp" && "$repo/install.sh" --project "$proj" >"$tmp/out5" 2>&1 )
 t "project: skill installed"  test -f "$proj/.claude/skills/auto-builder/SKILL.md"
-t "project: agents installed" test "$(ls "$proj/.claude/agents" | wc -l)" -eq 8
+t "project: all nine agents installed" test "$(ls "$proj/.claude/agents" | wc -l)" -eq "$n_agents"
+t "project: security-engineer installed" test -f "$proj/.claude/agents/security-engineer.md"
+t "project: installed agents identical to source" bash -c "for f in \"$repo\"/.claude/agents/*.md; do cmp -s \"\$f\" \"$proj/.claude/agents/\$(basename \"\$f\")\" || exit 1; done"
 
 # --- project install defaulting to cwd
 proj2="$tmp/proj2"; mkdir -p "$proj2"
@@ -67,6 +72,7 @@ nt "error: refuses own repo"     "$repo/install.sh" --project "$repo"
 art="$tmp/art"; mkdir -p "$art"
 t "init-artifacts: creates templates" "$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh" "$art/docs"
 t "init-artifacts: PROGRESS.md copied" test -f "$art/docs/PROGRESS.md"
+t "init-artifacts: SECURITY-REVIEW.md copied" test -f "$art/docs/SECURITY-REVIEW.md"
 t "init-artifacts: all templates copied" test "$(ls "$art/docs" | wc -l)" -eq "$(ls "$repo/.claude/skills/auto-builder/templates" | wc -l)"
 echo keep > "$art/docs/TASKS.md"
 "$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh" "$art/docs" >/dev/null 2>&1
