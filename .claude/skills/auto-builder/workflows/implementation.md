@@ -1,6 +1,6 @@
 # Implementation playbook
 
-- Work in small, reviewable slices.
+- Work one milestone at a time in small, reviewable slices; a milestone is finished only after its verification gate passes (see verification.md).
 - Read neighboring code and tests before editing.
 - Reuse existing libraries and patterns; add dependencies only with justification.
 - Keep each subagent's ownership bounded and avoid overlapping edits.

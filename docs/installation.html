@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install AUTO-BUILDER: Claude Code Skill Setup Guide</title>
+<meta name="description" content="Install the AUTO-BUILDER Claude Code skill and subagents for one project or all projects on Linux, macOS, WSL or Windows. Dry-run and update supported.">
+<link rel="canonical" href="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/installation.html">
+<meta name="theme-color" content="#0b5fff">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUTO-BUILDER">
+<meta property="og:title" content="Install AUTO-BUILDER: Claude Code Skill Setup Guide">
+<meta property="og:description" content="Install the AUTO-BUILDER Claude Code skill and subagents for one project or all projects on Linux, macOS, WSL or Windows. Dry-run and update supported.">
+<meta property="og:url" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/installation.html">
+<meta property="og:image" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/assets/og-image.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="AUTO-BUILDER: goal-driven autonomous development for Claude Code">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Install AUTO-BUILDER: Claude Code Skill Setup Guide">
+<meta name="twitter:description" content="Install the AUTO-BUILDER Claude Code skill and subagents for one project or all projects on Linux, macOS, WSL or Windows. Dry-run and update supported.">
+<meta name="twitter:image" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/assets/og-image.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#software",
+      "name": "AUTO-BUILDER",
+      "description": "Claude Code skill and subagents for goal-driven, autonomous software development with approval checkpoints.",
+      "codeRepository": "https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills",
+      "programmingLanguage": [
+        "Markdown",
+        "Bash",
+        "PowerShell",
+        "Python"
+      ],
+      "license": "https://www.apache.org/licenses/LICENSE-2.0",
+      "version": "0.1.0",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#website",
+      "name": "AUTO-BUILDER",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/installation.html#page",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/installation.html",
+      "name": "Install AUTO-BUILDER: Claude Code Skill Setup Guide",
+      "description": "Install the AUTO-BUILDER Claude Code skill and subagents for one project or all projects on Linux, macOS, WSL or Windows. Dry-run and update supported.",
+      "isPartOf": {
+        "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#website"
+      },
+      "about": {
+        "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#software"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Installation",
+          "item": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/installation.html"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="./" aria-label="AUTO-BUILDER home"><span class="logo" aria-hidden="true">AB</span> AUTO-BUILDER</a>
+    <nav aria-label="Main"><ul><li><a href="./">Home</a></li><li><a href="features.html">Features</a></li><li><a href="installation.html" aria-current="page">Installation</a></li><li><a href="usage.html">Usage</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="faq.html">FAQ</a></li><li><a class="gh" href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills">GitHub</a></li></ul></nav>
+  </div>
+</header>
+<main id="main" class="wrap">
+<h1>Install the AUTO-BUILDER Claude Code skill</h1>
+<p class="lead">Requires <a href="https://code.claude.com">Claude Code</a> and Git. The installer only copies files: it never edits your settings, permissions, hooks or <code>CLAUDE.md</code>.</p>
+<p class="toc">Jump to: <a href="#unix">Linux / macOS / WSL</a> &middot; <a href="#windows">Windows</a> &middot; <a href="#manual">Manual</a> &middot; <a href="#verify">Verify</a> &middot; <a href="#update">Update</a> &middot; <a href="#hooks">Hooks</a> &middot; <a href="#uninstall">Uninstall</a></p>
+
+<h2 id="unix">Linux, macOS, WSL and Git Bash</h2>
+<div class="codeblock"><pre><code>git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills.git
+cd ClaudeCODE-Autonomous-skills
+
+./install.sh --personal                 # all your projects (~/.claude)
+./install.sh --project /path/to/repo    # one project (&lt;repo&gt;/.claude)
+./install.sh --project --dry-run        # preview, writes nothing</code></pre></div>
+
+<h2 id="windows">Windows (PowerShell)</h2>
+<div class="codeblock"><pre><code>git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills.git
+cd ClaudeCODE-Autonomous-skills
+
+.\install.ps1 -Personal
+.\install.ps1 -Project -Path C:\path\to\repo
+.\install.ps1 -Project -DryRun</code></pre></div>
+<div class="note"><code>install.ps1</code> has not been executed by the author yet (no PowerShell was available during development). It mirrors the tested shell installer; please report any problem as an issue. If scripts are blocked: <code>powershell -ExecutionPolicy Bypass -File .\install.ps1 -Personal</code>.</div>
+
+<h2 id="manual">Manual install</h2>
+<p>Copy <code>.claude/skills/auto-builder/</code> and <code>.claude/agents/*.md</code> from the repository into <code>~/.claude/</code> (personal) or your project's <code>.claude/</code> directory. Opening Claude Code inside the cloned repository also works without installing.</p>
+
+<h2 id="verify">Verify the installation</h2>
+<ol>
+<li>Confirm <code>SKILL.md</code> exists at <code>.claude/skills/auto-builder/SKILL.md</code> (project) or <code>~/.claude/skills/auto-builder/SKILL.md</code> (personal), and eight files exist in the matching <code>agents/</code> folder.</li>
+<li>Start a new Claude Code session and type <code>/auto-builder</code>; it should appear as a command.</li>
+</ol>
+<p>Installer output labels each file <code>INSTALL</code>, <code>UPDATE</code>, <code>PRESERVE</code> (yours differs and was kept), <code>CONFLICT</code> (a symlink or directory is in the way) or <code>STALE</code> (left over from an older version).</p>
+
+<h2 id="update">Update</h2>
+<div class="codeblock"><pre><code>git pull
+./install.sh --personal --update     # replaces differing package files, keeps .bak backups</code></pre></div>
+
+<h2 id="hooks">Enable the optional hooks</h2>
+<p>Hooks are off by default. The JSON to add to <code>.claude/settings.json</code>, and their limits, are in the <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills#hooks-optional-off-by-default">README</a>. They require <code>jq</code>.</p>
+
+<h2 id="uninstall">Uninstall</h2>
+<p>Delete the <code>auto-builder</code> folder under <code>skills/</code> and the eight agent files (<code>product-manager.md</code>, <code>researcher.md</code>, <code>architect.md</code>, <code>frontend-engineer.md</code>, <code>backend-engineer.md</code>, <code>ai-engineer.md</code>, <code>qa-engineer.md</code>, <code>critical-reviewer.md</code>) from <code>agents/</code>. Check first that none are your own files of the same name.</p>
+
+<p>Next: <a href="usage.html">learn how to use it</a> or <a href="faq.html">read the FAQ</a>.</p>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p><strong>AUTO-BUILDER</strong> v0.1.0: an independent, open-source Claude Code skill released under the
+    <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/LICENSE">Apache-2.0 license</a>. Not affiliated with or endorsed by Anthropic.</p>
+    <p><a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills">Source on GitHub</a> &middot; <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/CHANGELOG.md">Changelog</a> &middot;
+    <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/CONTRIBUTING.md">Contributing</a> &middot; <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/issues">Issues</a></p>
+  </div>
+</footer>
+<script src="assets/site.js" defer></script>
+</body>
+</html>

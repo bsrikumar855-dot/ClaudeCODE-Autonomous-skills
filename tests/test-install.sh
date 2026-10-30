@@ -66,6 +66,8 @@ nt "error: refuses own repo"     "$repo/install.sh" --project "$repo"
 # --- installed init-artifacts script works and never overwrites
 art="$tmp/art"; mkdir -p "$art"
 t "init-artifacts: creates templates" "$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh" "$art/docs"
+t "init-artifacts: PROGRESS.md copied" test -f "$art/docs/PROGRESS.md"
+t "init-artifacts: all templates copied" test "$(ls "$art/docs" | wc -l)" -eq "$(ls "$repo/.claude/skills/auto-builder/templates" | wc -l)"
 echo keep > "$art/docs/TASKS.md"
 "$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh" "$art/docs" >/dev/null 2>&1
 t "init-artifacts: kept existing file" grep -q keep "$art/docs/TASKS.md"

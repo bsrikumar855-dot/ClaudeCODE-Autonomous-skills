@@ -217,6 +217,72 @@ def check_scripts():
             ok(os.path.exists(os.path.join(SKILL_DIR, m)), f"{rel(path)}: references missing script {m}")
 
 
+def section(text, heading, level="###"):
+    m = re.search(rf"^{level} {re.escape(heading)}.*?$(.*?)(?=^#{{2,3}} |\Z)", text, flags=re.S | re.M)
+    return m.group(1) if m else ""
+
+
+def check_protocol():
+    """The Quality protocol must be wired into the workflow, templates and docs, not just present."""
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    qp = section(skill, "Quality protocol", "##")
+    if not ok(bool(qp), "SKILL.md: missing '## Quality protocol' section"):
+        return
+    ok(len(re.findall(r"^\d\. \*\*", qp, flags=re.M)) == 7, "Quality protocol must have 7 numbered items")
+    for phrase in ("milestone gate", "Verified", "Partially verified", "Untested", "root cause",
+                   "not independent", "completion standard", "not a guarantee", "no extra approval"):
+        ok(phrase.lower() in qp.lower(), f"Quality protocol missing '{phrase}'")
+    # Enforcement points in the phases that must use it
+    wired = {"Phase 2": "measurable acceptance criteria", "Phase 4": "verification gate",
+             "Phase 5": "passed its gate", "Phase 6": "milestone gate", "Phase 7": "completion standard",
+             "Phase 8": "partially verified"}
+    for ph, needle in wired.items():
+        body = re.search(rf"^### {ph} .*?$(.*?)(?=^#{{2,3}} |\Z)", skill, flags=re.S | re.M)
+        ok(bool(body) and needle.lower() in body.group(1).lower(), f"SKILL.md {ph} does not enforce: '{needle}'")
+    # Bounds: 3 attempts, 5 passes per milestone, consistent everywhere
+    ok("3 fix attempts" in skill and "default 5 passes per milestone" in skill, "SKILL.md bounds (3 attempts / 5 passes per milestone) missing")
+    ok("full Phase 5–7 passes" not in skill, "SKILL.md still has the old project-wide pass budget")
+    tasks = open(os.path.join(SKILL_DIR, "templates", "TASKS.md"), encoding="utf-8").read()
+    ok("0 / 5" in tasks and "max 3" in tasks and "Milestone gates" in tasks and "Acceptance checklist" in tasks,
+       "templates/TASKS.md must carry the budget, attempt limit, milestone gates and acceptance checklist")
+    verification = open(os.path.join(SKILL_DIR, "workflows", "verification.md"), encoding="utf-8").read()
+    for phrase in ("Milestone gate checklist", "Evidence vocabulary", "Reviewer brief", "Failure recovery record", "1 of 3"):
+        ok(phrase in verification, f"workflows/verification.md missing '{phrase}'")
+    # State files named in SKILL.md == templates shipped
+    line = next((l for l in skill.splitlines() if l.startswith("`PROJECT.md`")), "")
+    named = set(re.findall(r"`([A-Z]+\.md)`", line))
+    shipped = {f for f in os.listdir(os.path.join(SKILL_DIR, "templates")) if f.endswith(".md")}
+    ok(named == shipped, f"state files in SKILL.md vs templates differ: {named ^ shipped}")
+    ok("PROGRESS.md" in shipped, "missing PROGRESS.md template")
+    # All eight agents referenced by SKILL.md and none invented
+    ref = set(re.findall(r"\| `([a-z-]+)` \|", skill))
+    ok(ref == EXPECTED_AGENTS, f"agents in SKILL.md table differ from shipped: {ref ^ EXPECTED_AGENTS}")
+    # Optional hooks must stay off by default: no shipped settings, installers never write settings
+    ok(not any(os.path.exists(os.path.join(ROOT, ".claude", f)) for f in ("settings.json", "settings.local.json")),
+       "repo must not ship a .claude/settings*.json (hooks must stay opt-in)")
+    for f in ("install.sh", "install.ps1"):
+        ok("settings.json" not in open(os.path.join(ROOT, f), encoding="utf-8").read(), f"{f} must not touch settings.json")
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    ok("optional, off by default" in readme.lower(), "README must say hooks are off by default")
+    # Docs must not overclaim the protocol
+    for p in (os.path.join(ROOT, "README.md"), os.path.join(ROOT, "site", "pages", "features.html")):
+        t = open(p, encoding="utf-8").read().lower()
+        ok("not a guarantee" in t, f"{rel(p)}: must state the protocol is not a guarantee")
+    # CI / GitHub YAML must parse when PyYAML is available
+    try:
+        import yaml
+        for base, _, files in os.walk(os.path.join(ROOT, ".github")):
+            for f in files:
+                if f.endswith((".yml", ".yaml")):
+                    try:
+                        yaml.safe_load(open(os.path.join(base, f), encoding="utf-8"))
+                        ok(True, "")
+                    except Exception as e:
+                        ok(False, f".github/{f}: invalid YAML: {str(e).splitlines()[0]}")
+    except ImportError:
+        pass
+
+
 def check_hygiene():
     skip_files = {"validate.py"}
     for p in list(md_files()) + [os.path.join(ROOT, "install.sh")]:
@@ -245,6 +311,7 @@ def main():
     check_agents()
     check_links()
     check_scripts()
+    check_protocol()
     check_hygiene()
     if errors:
         print(f"FAILED: {len(errors)} problem(s) in {checks} checks")

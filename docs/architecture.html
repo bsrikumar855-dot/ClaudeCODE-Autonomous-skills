@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture: Claude Code Subagents &amp; Dev Lifecycle</title>
+<meta name="description" content="How AUTO-BUILDER works: the lead agent, eight specialist subagents, state files, parallel-work rules, approval policy and the verify-and-review loop.">
+<link rel="canonical" href="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/architecture.html">
+<meta name="theme-color" content="#0b5fff">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUTO-BUILDER">
+<meta property="og:title" content="Architecture: Claude Code Subagents &amp; Dev Lifecycle">
+<meta property="og:description" content="How AUTO-BUILDER works: the lead agent, eight specialist subagents, state files, parallel-work rules, approval policy and the verify-and-review loop.">
+<meta property="og:url" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/architecture.html">
+<meta property="og:image" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/assets/og-image.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="AUTO-BUILDER: goal-driven autonomous development for Claude Code">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Architecture: Claude Code Subagents &amp; Dev Lifecycle">
+<meta name="twitter:description" content="How AUTO-BUILDER works: the lead agent, eight specialist subagents, state files, parallel-work rules, approval policy and the verify-and-review loop.">
+<meta name="twitter:image" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/assets/og-image.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#software",
+      "name": "AUTO-BUILDER",
+      "description": "Claude Code skill and subagents for goal-driven, autonomous software development with approval checkpoints.",
+      "codeRepository": "https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills",
+      "programmingLanguage": [
+        "Markdown",
+        "Bash",
+        "PowerShell",
+        "Python"
+      ],
+      "license": "https://www.apache.org/licenses/LICENSE-2.0",
+      "version": "0.1.0",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#website",
+      "name": "AUTO-BUILDER",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/architecture.html#page",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/architecture.html",
+      "name": "Architecture: Claude Code Subagents & Dev Lifecycle",
+      "description": "How AUTO-BUILDER works: the lead agent, eight specialist subagents, state files, parallel-work rules, approval policy and the verify-and-review loop.",
+      "isPartOf": {
+        "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#website"
+      },
+      "about": {
+        "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#software"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Architecture",
+          "item": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/architecture.html"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="./" aria-label="AUTO-BUILDER home"><span class="logo" aria-hidden="true">AB</span> AUTO-BUILDER</a>
+    <nav aria-label="Main"><ul><li><a href="./">Home</a></li><li><a href="features.html">Features</a></li><li><a href="installation.html">Installation</a></li><li><a href="usage.html">Usage</a></li><li><a href="architecture.html" aria-current="page">Architecture</a></li><li><a href="faq.html">FAQ</a></li><li><a class="gh" href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills">GitHub</a></li></ul></nav>
+  </div>
+</header>
+<main id="main" class="wrap">
+<h1>Architecture: one lead agent, eight Claude Code subagents</h1>
+<p class="lead">Your main Claude Code session is the lead. It owns planning, integration, git and the final report. Subagents do bounded, independent work and report back.</p>
+
+<h2 id="flow">Flow</h2>
+<ol class="phases" start="0"><li><strong>Phase 0: Reconnaissance.</strong> Inspect the repository, git state, conventions and the commands that build, test and lint it.</li><li><strong>Phase 1: Discovery.</strong> Frame the real problem and users, research where facts matter, compare approaches, recommend one.</li><li><strong>Phase 2: Product definition.</strong> Write testable requirements, user journeys and acceptance criteria.</li><li><strong>Phase 3: Architecture.</strong> Choose the stack, design components, data and APIs, and record trade-offs.</li><li><strong>Phase 4: Execution planning.</strong> Define measurable acceptance criteria and milestones with verification gates in a persistent task file, with a per-milestone iteration budget.</li><li><strong>Phase 5: Implementation.</strong> Build one milestone at a time as vertical slices on a work branch; the lead commits only after the milestone passes its gate.</li><li><strong>Phase 6: Independent verification.</strong> Run the milestone gate: tests, linters and regression checks, real user flows, then an independent review at meaningful checkpoints.</li><li><strong>Phase 7: Iterate.</strong> Repeat plan, build, test, review, fix per milestone, with root-cause analysis of failures, until the completion standard is met or a blocker needs you.</li><li><strong>Phase 8: Delivery.</strong> Report what was built and, per criterion, what is verified, partially verified or untested, whether review was independent, and what you must do next.</li></ol>
+<p>After phase 4 an optional <strong>Checkpoint A</strong> asks for your approval when a consequential choice is involved. Phases 5 to 7 repeat per milestone: each milestone must pass a verification gate before the next starts. The loop ends when the completion standard is met, a bound is hit, or a blocker needs you.</p>
+
+<h2 id="agents">Agents and permissions</h2>
+<div class="table-wrap"><table><caption>The eight AUTO-BUILDER subagents (generated from <code>.claude/agents/</code>)</caption><thead><tr><th scope="col">Agent</th><th scope="col">Responsibility</th><th scope="col">Tools</th><th scope="col">Can edit files</th></tr></thead><tbody><tr><th scope="row"><code>product-manager</code></th><td>Clarifies product goals, target users, user journeys, scope, prioritization and measurable acceptance criteria. Use for discovery and requirements, not coding.</td><td>Read, Grep, Glob, WebSearch, WebFetch</td><td>No edit tools</td></tr><tr><th scope="row"><code>researcher</code></th><td>Researches current libraries, APIs, standards and competitor patterns from primary sources. Use when current external facts materially affect a decision.</td><td>Read, Grep, Glob, WebSearch, WebFetch</td><td>No edit tools</td></tr><tr><th scope="row"><code>architect</code></th><td>Designs or independently critiques system architecture, data models, interfaces, security boundaries and implementation plans. Read-only.</td><td>Read, Grep, Glob</td><td>No edit tools</td></tr><tr><th scope="row"><code>frontend-engineer</code></th><td>Implements and reviews frontend features: components, state, responsive layouts, accessibility and browser interactions.</td><td>Read, Edit, Write, Bash, Grep, Glob</td><td>Yes (assigned files)</td></tr><tr><th scope="row"><code>backend-engineer</code></th><td>Implements backend services, APIs, database schemas, migrations, integrations, validation and data pipelines.</td><td>Read, Edit, Write, Bash, Grep, Glob</td><td>Yes (assigned files)</td></tr><tr><th scope="row"><code>ai-engineer</code></th><td>Designs and implements AI/ML features: LLM integrations, RAG, agents, evaluation, prompts and data/model pipelines.</td><td>Read, Edit, Write, Bash, Grep, Glob, WebSearch, WebFetch</td><td>Yes (assigned files)</td></tr><tr><th scope="row"><code>qa-engineer</code></th><td>Derives tests from acceptance criteria, runs verification, explores edge cases and independently validates behaviour. Read-only auditor: reports findings and proposes tests.</td><td>Read, Bash, Grep, Glob</td><td>No edit tools</td></tr><tr><th scope="row"><code>critical-reviewer</code></th><td>Independently reviews plans, diffs and implementations for correctness, security, regressions, maintainability and missed requirements. Read-only.</td><td>Read, Grep, Glob, Bash</td><td>No edit tools</td></tr></tbody></table></div>
+<p>Routing: product-manager for scope, researcher for current external facts, architect for design critique, the three engineers for implementation, and qa-engineer plus critical-reviewer for independent verification. The lead spawns only what a task needs.</p>
+
+<h2 id="state">State files</h2>
+<p>Project memory lives in files, not in the conversation: <code>docs/auto-builder/</code> holds <code>PROJECT.md</code>, <code>REQUIREMENTS.md</code>, <code>ARCHITECTURE.md</code>, <code>TASKS.md</code>, <code>TESTING.md</code>, <code>DECISIONS.md</code> and <code>PROGRESS.md</code> (a running log), created from templates only as the project warrants and never overwritten. <code>TASKS.md</code> also holds the milestone gate table and the Verified / Partially verified / Untested state of every acceptance criterion. Stable facts such as build commands may be proposed for your project's <code>CLAUDE.md</code>.</p>
+
+<h2 id="parallel">Parallel work rules</h2>
+<ul>
+<li>Parallelise only independent work, after shared interfaces are fixed.</li>
+<li>Every implementer gets an explicit list of files it owns. After integration the lead checks <code>git diff --stat</code> against it.</li>
+<li>Only the lead commits, installs dependencies and edits lockfiles, shared config and state files.</li>
+<li>Worktree isolation is an exception with caveats (needs a git repo; a fresh worktree may lack your unmerged work); see <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/.claude/skills/auto-builder/references/parallel-work.md">parallel-work.md</a>.</li>
+</ul>
+
+<h2 id="repo">Repository layout</h2>
+<div class="codeblock"><pre><code>.claude/
+  agents/                 8 subagent definitions
+  skills/auto-builder/
+    SKILL.md              the /auto-builder skill
+    workflows/            discovery, planning, implementation, verification, delivery
+    references/           project categories, parallel work, Claude Code features
+    templates/            state-file templates
+    scripts/              init-artifacts.sh, hooks/ (opt-in)
+install.sh  install.ps1   installers
+tests/                    validate.py, test-install.sh
+site/  docs/              this website (generator and output)</code></pre></div>
+<p>Supporting documents are loaded on demand (progressive disclosure); <code>SKILL.md</code> stays short. Next: <a href="installation.html">install it</a>.</p>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p><strong>AUTO-BUILDER</strong> v0.1.0: an independent, open-source Claude Code skill released under the
+    <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/LICENSE">Apache-2.0 license</a>. Not affiliated with or endorsed by Anthropic.</p>
+    <p><a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills">Source on GitHub</a> &middot; <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/CHANGELOG.md">Changelog</a> &middot;
+    <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/CONTRIBUTING.md">Contributing</a> &middot; <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/issues">Issues</a></p>
+  </div>
+</footer>
+<script src="assets/site.js" defer></script>
+</body>
+</html>

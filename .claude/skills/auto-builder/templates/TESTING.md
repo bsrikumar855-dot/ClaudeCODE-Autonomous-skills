@@ -16,5 +16,5 @@
 
 ## Commands and observed results
 
-| Check | Command | Result | Notes |
-|---|---|---|---|
+| Check | Command | Result (observed) | State (Verified / Partially verified / Untested) | Notes |
+|---|---|---|---|---|

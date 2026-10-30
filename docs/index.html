@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AUTO-BUILDER: Autonomous Coding Agent Skill for Claude Code</title>
+<meta name="description" content="Open-source Claude Code skill with eight subagents: turn a goal into a planned, built, tested and independently reviewed project, with approval checkpoints.">
+<link rel="canonical" href="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/">
+<meta name="theme-color" content="#0b5fff">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUTO-BUILDER">
+<meta property="og:title" content="AUTO-BUILDER: Autonomous Coding Agent Skill for Claude Code">
+<meta property="og:description" content="Open-source Claude Code skill with eight subagents: turn a goal into a planned, built, tested and independently reviewed project, with approval checkpoints.">
+<meta property="og:url" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/">
+<meta property="og:image" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/assets/og-image.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="AUTO-BUILDER: goal-driven autonomous development for Claude Code">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AUTO-BUILDER: Autonomous Coding Agent Skill for Claude Code">
+<meta name="twitter:description" content="Open-source Claude Code skill with eight subagents: turn a goal into a planned, built, tested and independently reviewed project, with approval checkpoints.">
+<meta name="twitter:image" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/assets/og-image.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#software",
+      "name": "AUTO-BUILDER",
+      "description": "Claude Code skill and subagents for goal-driven, autonomous software development with approval checkpoints.",
+      "codeRepository": "https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills",
+      "programmingLanguage": [
+        "Markdown",
+        "Bash",
+        "PowerShell",
+        "Python"
+      ],
+      "license": "https://www.apache.org/licenses/LICENSE-2.0",
+      "version": "0.1.0",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#website",
+      "name": "AUTO-BUILDER",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#page",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/",
+      "name": "AUTO-BUILDER: Autonomous Coding Agent Skill for Claude Code",
+      "description": "Open-source Claude Code skill with eight subagents: turn a goal into a planned, built, tested and independently reviewed project, with approval checkpoints.",
+      "isPartOf": {
+        "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#website"
+      },
+      "about": {
+        "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#software"
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="./" aria-label="AUTO-BUILDER home"><span class="logo" aria-hidden="true">AB</span> AUTO-BUILDER</a>
+    <nav aria-label="Main"><ul><li><a href="./" aria-current="page">Home</a></li><li><a href="features.html">Features</a></li><li><a href="installation.html">Installation</a></li><li><a href="usage.html">Usage</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="faq.html">FAQ</a></li><li><a class="gh" href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills">GitHub</a></li></ul></nav>
+  </div>
+</header>
+<main id="main" class="wrap">
+<section class="hero">
+<h1>Goal-driven autonomous development for Claude Code</h1>
+<p class="lead">AUTO-BUILDER is an open-source Claude Code skill with eight specialist subagents. Give <code>/auto-builder</code> a goal and it plans, builds, tests, independently reviews and documents the result, pausing for you only at consequential decisions.</p>
+<div class="cta">
+  <a class="btn primary" href="installation.html">Install AUTO-BUILDER</a>
+  <a class="btn secondary" href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills">View on GitHub</a>
+</div>
+<div class="codeblock"><pre><code>git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills.git
+cd ClaudeCODE-Autonomous-skills
+./install.sh --personal</code></pre></div>
+<p>Then, inside Claude Code: <code>/auto-builder Build a REST API for a habit tracker with tests</code></p>
+<div class="note"><strong>Project status: early release (v0.1.0).</strong> Static validation and installer/hook tests pass, but the skill has not yet been validated end-to-end in live Claude Code sessions, and the Windows installer has not been executed. <a href="faq.html#limitations">Read the known limitations</a>.</div>
+</section>
+
+<section aria-labelledby="what">
+<h2 id="what">What is AUTO-BUILDER?</h2>
+<p>It is a reusable <strong>Claude Code skill</strong> plus <strong>Claude Code subagents</strong> that encode an AI software development workflow: discover the real problem, define testable requirements, design the architecture, plan small tasks, implement, verify, review and deliver. It targets one common failure of autonomous coding agents: jumping straight to code and declaring success after a single green build.</p>
+<div class="grid">
+  <article class="card"><h3>Goal in, plan first</h3><p>Describe an outcome in plain language. The lead agent inspects your repository, writes requirements and a task list with acceptance criteria before editing code.</p></article>
+  <article class="card"><h3>Specialist subagents</h3><p>Eight roles from product manager to critical reviewer, each with a least-privilege tool list. Reviewers have no edit tools.</p></article>
+  <article class="card"><h3>Verified, not trusted</h3><p>Work proceeds in milestones that each pass a verification gate. Checks must actually run, a separate reviewer inspects important milestones, and the report labels each criterion Verified, Partially verified or Untested.</p></article>
+  <article class="card"><h3>Autonomy with checkpoints</h3><p>Routine decisions are made for you. It asks before deploys, spending, destructive data operations, secrets, pushing, or changes of product direction.</p></article>
+</div>
+</section>
+
+<section aria-labelledby="lifecycle">
+<h2 id="lifecycle">The lifecycle</h2>
+<p>Reconnaissance &rarr; Discovery &rarr; Product definition &rarr; Architecture &rarr; Execution planning &rarr; Implementation &rarr; Independent verification &rarr; Iterate &rarr; Delivery</p>
+<p>Each phase has a purpose and an exit condition; see <a href="features.html#lifecycle">the full lifecycle</a> and the <a href="architecture.html">architecture</a>.</p>
+</section>
+
+<section aria-labelledby="fits">
+<h2 id="fits">Works for many project types</h2>
+<p>AI/ML applications, AI agents and multi-agent systems, full-stack apps, frontends, backend APIs, developer tools, research projects, automation and data engineering. The skill adapts its discovery, architecture and verification emphasis per category.</p>
+<p><a href="usage.html">See example goals and a first-run tutorial &rarr;</a></p>
+</section>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p><strong>AUTO-BUILDER</strong> v0.1.0: an independent, open-source Claude Code skill released under the
+    <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/LICENSE">Apache-2.0 license</a>. Not affiliated with or endorsed by Anthropic.</p>
+    <p><a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills">Source on GitHub</a> &middot; <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/CHANGELOG.md">Changelog</a> &middot;
+    <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/CONTRIBUTING.md">Contributing</a> &middot; <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/issues">Issues</a></p>
+  </div>
+</footer>
+<script src="assets/site.js" defer></script>
+</body>
+</html>

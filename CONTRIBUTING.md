@@ -15,8 +15,9 @@ git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills
 cd ClaudeCODE-Autonomous-skills
 python3 -I tests/validate.py     # static validation
 bash tests/test-install.sh       # installer tests in temp dirs
+python3 -I site/build.py && python3 -I site/check.py   # only if you touched the website
 ```
-Both must pass; CI runs them on every PR.
+All must pass; CI runs them on every PR.
 
 ## Where things live
 | Change | Edit |
@@ -25,7 +26,11 @@ Both must pass; CI runs them on every PR.
 | Detailed playbooks | `.claude/skills/auto-builder/workflows/`, `references/` |
 | Agent behaviour | `.claude/agents/<name>.md` |
 | State-file templates | `.claude/skills/auto-builder/templates/` |
+| Website content | `site/pages/*.html` and `site/build.py`, then rebuild `docs/` (never hand-edit `docs/*.html`; the site's agent table and phase list are generated from the repo) |
+| Launch/SEO drafts | `launch/` (drafts only; nothing there is published automatically) |
 | Install behaviour | `install.sh` **and** `install.ps1` (keep equivalent) |
+
+Note: this repository's `docs/` folder is the GitHub Pages website. It is unrelated to the `docs/auto-builder/` state files the skill creates in *your* projects.
 
 ## Pull requests
 - One focused change per PR; update `CHANGELOG.md` under *Unreleased*.

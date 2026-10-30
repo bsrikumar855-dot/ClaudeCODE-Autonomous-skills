@@ -1,0 +1,35 @@
+<h1>Architecture: one lead agent, eight Claude Code subagents</h1>
+<p class="lead">Your main Claude Code session is the lead. It owns planning, integration, git and the final report. Subagents do bounded, independent work and report back.</p>
+
+<h2 id="flow">Flow</h2>
+{{PHASE_LIST}}
+<p>After phase 4 an optional <strong>Checkpoint A</strong> asks for your approval when a consequential choice is involved. Phases 5 to 7 repeat per milestone: each milestone must pass a verification gate before the next starts. The loop ends when the completion standard is met, a bound is hit, or a blocker needs you.</p>
+
+<h2 id="agents">Agents and permissions</h2>
+{{AGENT_TABLE}}
+<p>Routing: product-manager for scope, researcher for current external facts, architect for design critique, the three engineers for implementation, and qa-engineer plus critical-reviewer for independent verification. The lead spawns only what a task needs.</p>
+
+<h2 id="state">State files</h2>
+<p>Project memory lives in files, not in the conversation: <code>docs/auto-builder/</code> holds <code>PROJECT.md</code>, <code>REQUIREMENTS.md</code>, <code>ARCHITECTURE.md</code>, <code>TASKS.md</code>, <code>TESTING.md</code>, <code>DECISIONS.md</code> and <code>PROGRESS.md</code> (a running log), created from templates only as the project warrants and never overwritten. <code>TASKS.md</code> also holds the milestone gate table and the Verified / Partially verified / Untested state of every acceptance criterion. Stable facts such as build commands may be proposed for your project's <code>CLAUDE.md</code>.</p>
+
+<h2 id="parallel">Parallel work rules</h2>
+<ul>
+<li>Parallelise only independent work, after shared interfaces are fixed.</li>
+<li>Every implementer gets an explicit list of files it owns. After integration the lead checks <code>git diff --stat</code> against it.</li>
+<li>Only the lead commits, installs dependencies and edits lockfiles, shared config and state files.</li>
+<li>Worktree isolation is an exception with caveats (needs a git repo; a fresh worktree may lack your unmerged work); see <a href="{{GH}}/blob/main/.claude/skills/auto-builder/references/parallel-work.md">parallel-work.md</a>.</li>
+</ul>
+
+<h2 id="repo">Repository layout</h2>
+<div class="codeblock"><pre><code>.claude/
+  agents/                 8 subagent definitions
+  skills/auto-builder/
+    SKILL.md              the /auto-builder skill
+    workflows/            discovery, planning, implementation, verification, delivery
+    references/           project categories, parallel work, Claude Code features
+    templates/            state-file templates
+    scripts/              init-artifacts.sh, hooks/ (opt-in)
+install.sh  install.ps1   installers
+tests/                    validate.py, test-install.sh
+site/  docs/              this website (generator and output)</code></pre></div>
+<p>Supporting documents are loaded on demand (progressive disclosure); <code>SKILL.md</code> stays short. Next: <a href="installation.html">install it</a>.</p>

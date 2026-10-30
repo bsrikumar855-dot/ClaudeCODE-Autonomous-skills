@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Use AUTO-BUILDER: Goal-Driven Coding Agent Tutorial</title>
+<meta name="description" content="How to run /auto-builder: write a goal, approve the plan, follow the lifecycle, and read the delivery report. Includes example goals and a first-run tutorial.">
+<link rel="canonical" href="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/usage.html">
+<meta name="theme-color" content="#0b5fff">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AUTO-BUILDER">
+<meta property="og:title" content="Use AUTO-BUILDER: Goal-Driven Coding Agent Tutorial">
+<meta property="og:description" content="How to run /auto-builder: write a goal, approve the plan, follow the lifecycle, and read the delivery report. Includes example goals and a first-run tutorial.">
+<meta property="og:url" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/usage.html">
+<meta property="og:image" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/assets/og-image.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="AUTO-BUILDER: goal-driven autonomous development for Claude Code">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Use AUTO-BUILDER: Goal-Driven Coding Agent Tutorial">
+<meta name="twitter:description" content="How to run /auto-builder: write a goal, approve the plan, follow the lifecycle, and read the delivery report. Includes example goals and a first-run tutorial.">
+<meta name="twitter:image" content="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/assets/og-image.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#software",
+      "name": "AUTO-BUILDER",
+      "description": "Claude Code skill and subagents for goal-driven, autonomous software development with approval checkpoints.",
+      "codeRepository": "https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills",
+      "programmingLanguage": [
+        "Markdown",
+        "Bash",
+        "PowerShell",
+        "Python"
+      ],
+      "license": "https://www.apache.org/licenses/LICENSE-2.0",
+      "version": "0.1.0",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#website",
+      "name": "AUTO-BUILDER",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/usage.html#page",
+      "url": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/usage.html",
+      "name": "Use AUTO-BUILDER: Goal-Driven Coding Agent Tutorial",
+      "description": "How to run /auto-builder: write a goal, approve the plan, follow the lifecycle, and read the delivery report. Includes example goals and a first-run tutorial.",
+      "isPartOf": {
+        "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#website"
+      },
+      "about": {
+        "@id": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/#software"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Usage",
+          "item": "https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/usage.html"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="./" aria-label="AUTO-BUILDER home"><span class="logo" aria-hidden="true">AB</span> AUTO-BUILDER</a>
+    <nav aria-label="Main"><ul><li><a href="./">Home</a></li><li><a href="features.html">Features</a></li><li><a href="installation.html">Installation</a></li><li><a href="usage.html" aria-current="page">Usage</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="faq.html">FAQ</a></li><li><a class="gh" href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills">GitHub</a></li></ul></nav>
+  </div>
+</header>
+<main id="main" class="wrap">
+<h1>Use AUTO-BUILDER: a goal-driven coding agent in practice</h1>
+<p class="lead">Invoke it with <code>/auto-builder</code> followed by a goal and any constraints. It is explicit-invoke only.</p>
+
+<h2 id="invoke">Invoke the skill</h2>
+<div class="codeblock"><pre><code>/auto-builder Add a rate-limited, paginated /v1/orders API with tests. Reuse the existing stack. Do not deploy anything.</code></pre></div>
+<p>With no argument it inspects the repository and asks for one concise goal. Good goals state the outcome, constraints and what <em>not</em> to do. Useful phrases: "stop at the plan checkpoint", "no branch".</p>
+
+<h2 id="goals">Example goals</h2>
+<div class="table-wrap"><table><thead><tr><th scope="col">Category</th><th scope="col">Example</th></tr></thead><tbody>
+<tr><th scope="row">AI/ML app</th><td>Add semantic search over support articles with an evaluation set measuring recall@5</td></tr>
+<tr><th scope="row">Multi-agent system</th><td>Build a triage bot that classifies GitHub issues and drafts replies for human approval</td></tr>
+<tr><th scope="row">Full-stack</th><td>Build a team habit tracker with auth, a REST API and a React UI</td></tr>
+<tr><th scope="row">Frontend</th><td>Make the settings page keyboard accessible and responsive</td></tr>
+<tr><th scope="row">Backend</th><td>Add rate-limited, paginated endpoints with OpenAPI docs and tests</td></tr>
+<tr><th scope="row">Developer tool</th><td>Create a CLI that lints OpenAPI specs against our style guide</td></tr>
+<tr><th scope="row">Automation</th><td>Automate weekly invoice export from a drop folder, with a dry-run mode</td></tr>
+<tr><th scope="row">Data engineering</th><td>Build an idempotent daily ETL into Postgres with quality checks</td></tr>
+</tbody></table></div>
+
+<h2 id="tutorial">Tutorial: your first run</h2>
+<ol>
+<li><strong>Install</strong> the skill (<a href="installation.html">guide</a>) and open Claude Code in a project, preferably a git repository with a clean working tree.</li>
+<li><strong>Run</strong> <code>/auto-builder</code> with a small, concrete goal for your first try.</li>
+<li><strong>Reconnaissance.</strong> The lead reads your repository, notes git state and finds the test, lint and build commands. If you have uncommitted changes it records which files they touch so it never commits them.</li>
+<li><strong>Discovery to planning.</strong> It frames the problem, writes requirements with testable acceptance criteria and a task list under <code>docs/auto-builder/</code> (you can run <code>bash .claude/skills/auto-builder/scripts/init-artifacts.sh</code> yourself to see the templates). <code>TASKS.md</code> has a Status block, an acceptance checklist with an evidence column and an iteration budget.</li>
+<li><strong>Checkpoint A.</strong> If a consequential choice is involved, or you asked for it, it pauses and summarises direction, architecture, risks and assumptions. Approve or redirect.</li>
+<li><strong>Build, verify, review, one milestone at a time.</strong> It implements vertical slices on an <code>auto-builder/&lt;slug&gt;</code> branch, then runs the milestone gate: tests, regression checks, real flows, and a separate review by <code>critical-reviewer</code> (and <code>qa-engineer</code> for user-facing behaviour) at meaningful milestones and at the end. It records evidence in <code>TASKS.md</code> and its log in <code>PROGRESS.md</code>. Failures are root-caused, fixed, and re-checked, within the bounded loop.</li>
+<li><strong>Delivery report.</strong> You get what was built, decisions, checks that actually ran, which criteria are verified, partially verified or untested, whether the review was independent, limitations, run and deploy guidance, and files changed. Read it, then review the diff yourself.</li>
+<li><strong>Merge when satisfied.</strong> It is instructed not to push or open a pull request unless you explicitly ask.</li>
+</ol>
+
+<h2 id="tips">Tips</h2>
+<ul>
+<li>Pre-allow your test, lint and build commands in Claude Code permissions so a run is not stalled by prompts. Prefer narrow rules over bypass modes.</li>
+<li>If a session is compacted or restarted, the lead re-reads <code>docs/auto-builder/TASKS.md</code> to resume from the recorded phase.</li>
+<li>Because the skill is explicit-invoke only, scheduled or looped re-entry will not start it automatically.</li>
+<li>Autonomy is bounded: three attempts per failing check and an iteration budget of five passes per milestone. When a bound is hit it stops that milestone, records the blocker and reports it with a recommended decision; it asks you only if it needs you.</li>
+</ul>
+<p>Questions? See the <a href="faq.html">FAQ</a> or the <a href="architecture.html">architecture</a>.</p>
+
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p><strong>AUTO-BUILDER</strong> v0.1.0: an independent, open-source Claude Code skill released under the
+    <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/LICENSE">Apache-2.0 license</a>. Not affiliated with or endorsed by Anthropic.</p>
+    <p><a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills">Source on GitHub</a> &middot; <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/CHANGELOG.md">Changelog</a> &middot;
+    <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/blob/main/CONTRIBUTING.md">Contributing</a> &middot; <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/issues">Issues</a></p>
+  </div>
+</footer>
+<script src="assets/site.js" defer></script>
+</body>
+</html>
