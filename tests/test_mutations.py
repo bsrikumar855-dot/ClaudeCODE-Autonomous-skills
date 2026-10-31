@@ -53,7 +53,7 @@ MUTATIONS = [
     ("browser QA lets the checker be cited", f"{SK}/workflows/browser-qa.md", "**never cite the checker as verification**", "cite the checker", "never cite the checker as verification"),
     ("browser-report drops the notice", f"{SK}/scripts/ab.py", "FORMAT CHECK ONLY", "OK", "FORMAT CHECK ONLY"),
     ("tdd allows weakening checks", f"{SK}/workflows/tdd.md", "**Never weaken the check**", "Weakening is fine", "never weaken the check"),
-    ("SKILL drops the not-performed rule", f"{SK}/SKILL.md", 'say "browser QA not performed"', 'say nothing', "browser qa not performed"),
+    ("SKILL drops the not-performed rule", f"{SK}/SKILL.md", 'say "browser QA not performed"', 'say nothing', "'not performed' rule"),
     ("3-attempt limit defined twice", f"{SK}/SKILL.md", "Iteration limits are defined once: **3** attempts", "Iteration limits: 3 fix attempts and **3** attempts", "defined exactly once"),
 ]
 
