@@ -3,6 +3,7 @@
 This repo *is* a Claude Code skill package. Source of truth: `.claude/skills/auto-builder/` (skill) and `.claude/agents/` (subagents). Installers (`install.sh`, `install.ps1`) copy those into a user's `~/.claude` or a project's `.claude`.
 
 ## Checks (run before finishing any change)
+- `bash tests/run-all.sh` — runs everything below (use it as the commit gate)
 - `python3 -I tests/validate.py` — frontmatter, links, script syntax, hygiene
 - `bash tests/test-install.sh` — installer behaviour in temp dirs (never touches real `~/.claude`)
 

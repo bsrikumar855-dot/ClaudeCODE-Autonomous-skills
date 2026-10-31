@@ -25,9 +25,15 @@
 <details><summary>How is it different from just prompting Claude Code?</summary>
 <p>It packages a repeatable process: a plan and acceptance criteria before code, a persistent task file that survives compaction, milestone gates with recorded evidence, bounded fix loops with root-cause analysis, independent review at meaningful milestones, least-privilege subagents and git rules. Whether that yields better results for your project is for you to judge; no benchmarks are claimed.</p></details>
 
+<details><summary>Does it need Python?</summary>
+<p>No. The skill and agents are Markdown. An optional helper script (<code>scripts/ab.py</code>, standard library only) can check task tables, compare recorded state with git, and format-check browser QA evidence. If Python 3 is missing the lead applies the same rules by hand. The helper writes nothing, uses no network, is not wired into any hook, and may trigger an ordinary permission prompt when run.</p></details>
+
+<details><summary>Does it test my app in a real browser?</summary>
+<p>Only if a browser is available: the project's own end-to-end tests, browser tools in your Claude Code session, a runner such as Playwright installed in your project, or headless Chrome. AUTO-BUILDER ships no browser. If none is available the report says "browser QA not performed" and the affected journeys are untested. The evidence file has a checker that rejects inconsistent reports, but it proves nothing about what the app did.</p></details>
+
 <details id="limitations"><summary>What are the known limitations?</summary>
 <ul>
-<li>Not yet validated end-to-end in live Claude Code sessions.</li>
+<li>Not yet validated end-to-end in live Claude Code sessions. That includes the task router (its labelled evaluation set has not been run), the arena, the parallel execution workflow and session recovery. No claim is made about improved outcomes, and the old-versus-new benchmark is designed but not run.</li>
 <li><code>install.ps1</code> has not been executed on Windows by the author.</li>
 <li>The reviewer and QA agents have Bash, which cannot be technically restricted; they are instructed to be read-only.</li>
 <li>The optional secret-protection hook does not cover Bash commands or Read.</li>

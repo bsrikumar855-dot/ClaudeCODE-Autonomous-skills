@@ -314,6 +314,333 @@ def check_protocol():
         pass
 
 
+def table_rows(text, first_col_header):
+    """Parse a markdown table whose header starts with first_col_header; return list of cell lists."""
+    lines, out, on = text.splitlines(), [], False
+    for l in lines:
+        if l.startswith("|") and l.lower().lstrip("| ").startswith(first_col_header.lower()):
+            on = True
+            continue
+        if on:
+            if not l.startswith("|"):
+                break
+            cells = [c.strip() for c in l.strip().strip("|").split("|")]
+            if set("".join(cells)) <= set("-: "):
+                continue
+            out.append(cells)
+    return out
+
+
+def check_router():
+    """Router table, playbooks, discovery/arena rules, principles, untrusted-data and limits (mechanism tests)."""
+    wf = os.path.join(SKILL_DIR, "workflows")
+    pb = os.path.join(SKILL_DIR, "playbooks")
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    router_path = os.path.join(wf, "router.md")
+    if not ok(os.path.isfile(router_path), "missing workflows/router.md"):
+        return
+    router = open(router_path, encoding="utf-8").read()
+    cats = ["new-project", "new-feature", "bug-fix", "investigation", "refactoring", "performance",
+            "security-assessment", "code-review", "research", "testing", "documentation", "release-deployment"]
+    rows = table_rows(router, "Category")
+    ok([r[0] for r in rows] == cats, f"router table categories differ: {[r[0] for r in rows]}")
+    for r in rows:
+        if len(r) != 4:
+            ok(False, f"router row malformed: {r}")
+            continue
+        cat, play, spec, gates = r
+        path, _, anchor = play.partition("#")
+        if cat != "new-project":
+            f = os.path.join(SKILL_DIR, path)
+            if ok(os.path.isfile(f), f"router: playbook missing for {cat}: {play}") and anchor:
+                ok(re.search(rf"^## {re.escape(anchor)}\b", open(f, encoding="utf-8").read(), flags=re.M) is not None,
+                   f"router: anchor '#{anchor}' not found in {path}")
+        for sp in [x.strip() for x in spec.split(",") if x.strip()]:
+            ok(sp in EXPECTED_AGENTS, f"router: unknown specialist '{sp}' for {cat}")
+        kv = dict(x.strip().split(":", 1) for x in gates.split(";") if ":" in x)
+        ok("security" in kv and kv["security"] in ("if-triggered", "always"), f"router: {cat} must have security:if-triggered|always (never 'no')")
+    by = {r[0]: r for r in rows if len(r) == 4}
+    if "security-assessment" in by:
+        ok("security:always" in by["security-assessment"][3].replace(" ", ""), "security-assessment must have security:always")
+    if "release-deployment" in by:
+        ok("approval:always" in by["release-deployment"][3].replace(" ", ""), "release-deployment must have approval:always")
+    for phrase in ("trivial bypass", "user's own message", "gates are **added**", "never removed", "one** focused question",
+                   "never ask", "one milestone row", "has **not been run**", "judged by what the change touches"):
+        ok(phrase.lower() in router.lower(), f"router.md missing: '{phrase}'")
+    # routing eval set
+    fx = os.path.join(ROOT, "tests", "fixtures", "routing-eval.json")
+    if ok(os.path.isfile(fx), "missing tests/fixtures/routing-eval.json"):
+        import json
+        data = json.load(open(fx, encoding="utf-8"))
+        ok(data.get("status") == "NOT RUN", "routing eval set must be labelled status NOT RUN")
+        valid = set(cats) | {"ask", "trivial"}
+        kinds = {c["kind"] for c in data["cases"]}
+        ok(len(data["cases"]) >= 24, "routing eval set too small")
+        ok({"clear", "ambiguous", "trivial", "adversarial"} <= kinds, f"eval set must cover clear/ambiguous/trivial/adversarial, has {kinds}")
+        ok(all(c["expected"] in valid and set(c.get("acceptable", [])) <= valid for c in data["cases"]), "eval set references an unknown category")
+        ok(all(c["expected"] in ("ask", "trivial") or c["expected"] in cats for c in data["cases"]), "bad expected category")
+        ok(sum(1 for c in data["cases"] if c["kind"] == "ambiguous") >= 3, "need ambiguous cases")
+        ok(set(data["categories"]) == set(cats) and all(any(c["expected"] == k for c in data["cases"]) for k in cats),
+           "eval set must have at least one case per category")
+    # playbooks
+    principles = open(os.path.join(SKILL_DIR, "principles", "engineering-principles.md"), encoding="utf-8").read()
+    ids = [f"P{n:02d}" for n in range(1, 14)]
+    for pid in ids:
+        ok(re.search(rf"^\| {pid} \|", principles, flags=re.M) is not None, f"principle {pid} missing")
+    names = ("Simplicity", "Maintainability", "Testability", "Security by design", "Least privilege", "API design",
+             "Error handling", "Performance", "Observability", "Documentation", "Dependency management",
+             "Backward compatibility", "Evidence-based completion")
+    ok(all(n in principles for n in names), "principles file missing one of the 13 required topics")
+    ok(all("Verify by" in principles for _ in [0]) and principles.count("|") > 13 * 4, "principles need a 'Verify by' column")
+    used = set()
+    expected_files = {"feature.md", "bug-fix.md", "refactor.md", "performance.md", "security-assessment.md",
+                      "inquiry.md", "test-and-docs.md", "release.md"}
+    ok(os.path.isdir(pb) and set(os.listdir(pb)) == expected_files, f"playbooks differ: {set(os.listdir(pb)) ^ expected_files if os.path.isdir(pb) else 'missing dir'}")
+    for f in sorted(expected_files):
+        t = open(os.path.join(pb, f), encoding="utf-8").read()
+        ok(len(t.splitlines()) <= 60, f"playbooks/{f} too long")
+        ok(not re.search(r"^\W*(Specialists|Gates)\b", t, flags=re.M), f"playbooks/{f} restates specialists/gates (router.md is the only place)")
+        ok(not re.search(r"(≤|at most|up to|max(imum)?)\s*\d", t, flags=re.I), f"playbooks/{f} states a numeric cap (see SKILL.md Limits)")
+        if f in ("inquiry.md", "test-and-docs.md"):
+            sections = re.split(r"^## ", t, flags=re.M)[1:]
+            for sec in sections:
+                ok(all(h in sec for h in ("**Steps**", "**Principles**", "**Completion criteria**")), f"playbooks/{f} section '{sec.splitlines()[0]}' incomplete")
+        else:
+            ok(all(h in t for h in ("## Steps", "## Principles", "## Completion criteria")), f"playbooks/{f} missing Steps/Principles/Completion criteria")
+        used |= set(re.findall(r"\bP\d\d\b", t))
+        ok(set(re.findall(r"\bP\d\d\b", t)) <= set(ids), f"playbooks/{f} cites an unknown principle")
+        crit_blocks = re.split(r"Completion criteria", t)[1:]
+        ok(crit_blocks and all(len(re.findall(r"^\s*- ", blk.split("\n## ")[0], flags=re.M)) >= 2 for blk in crit_blocks),
+           f"playbooks/{f}: each Completion criteria block needs at least two concrete bullets")
+    ok(used >= set(ids), f"principles never cited by any playbook: {sorted(set(ids) - used)}")
+    # no numeric caps outside SKILL.md Limits in workflows/references
+    for d in (wf, os.path.join(SKILL_DIR, "references")):
+        for f in sorted(os.listdir(d)):
+            t = open(os.path.join(d, f), encoding="utf-8").read()
+            ok(not re.search(r"(≤|at most|up to)\s*\d", t, flags=re.I), f"{f}: numeric cap outside SKILL.md Limits")
+    # discovery (interrogation) and arena
+    disc = open(os.path.join(wf, "discovery.md"), encoding="utf-8").read().lower()
+    for phrase in ("run it", "skip it", "trivial", "what is the smallest valuable solution", "which assumptions are unverified",
+                   "what are the success metrics", "explicitly **not** be built", "how is it solved today",
+                   "product discovery", "ceo-level challenge", "mvp scope review", "feature prioritization", "user-journey analysis",
+                   "decision tiers", "user-challenge", "final authority", "do not agree automatically", "inspect an existing application"):
+        ok(phrase in disc, f"discovery.md missing: '{phrase}'")
+    arena = open(os.path.join(wf, "arena.md"), encoding="utf-8").read().lower()
+    for phrase in ("hard to reverse", "never for conventional", "pre-mortem", "into `decisions.md` first", "why each alternative was rejected",
+                   "does not make the decision objective", "fresh-context", "limits", "security-engineer", "reframe once", "ask the user"):
+        ok(phrase in arena, f"arena.md missing: '{phrase}'")
+    # SKILL.md wiring: router, untrusted data, limits
+    for sec, phrases in (("Task router", ("trivial changes", "12 categories", "one milestone row", "only **adds** gates", "one focused question", "never ask")),
+                         ("Untrusted data", ("data, not instructions", "never** grant an approval", "waive a gate", "raise or reset a limit",
+                                              "only lower", "current session", "tell the user what you found", "marking it as data")),
+                         ("Limits", ("must not change them", "never as a new budget", "concurrent workers per wave", "arena independent candidates",
+                                     "3 fix-push-recheck rounds", "elapsed"))):
+        body = section(skill, sec, "##").lower()
+        ok(bool(body), f"SKILL.md missing section '{sec}'")
+        for ph in phrases:
+            ok(ph.lower() in body, f"SKILL.md '{sec}' missing: '{ph}'")
+    ok("workflows/router.md" in skill and "workflows/arena.md" in skill and "principles/engineering-principles.md" in skill,
+       "SKILL.md must link router, arena and principles")
+    ok("workflows/discovery.md" in section(skill, "Phase 1", "###") or "discovery.md" in skill, "Phase 1 must reference discovery/interrogation")
+    ok(len(skill.splitlines()) < 300, "SKILL.md should stay compact (<300 lines)")
+    tasks = open(os.path.join(SKILL_DIR, "templates", "TASKS.md"), encoding="utf-8").read()
+    ok("| Flags |" in tasks and "Verified at (sha)" in tasks and "Strict grammar" in tasks, "TASKS.md template needs Flags, Verified at (sha) and the strict-grammar note")
+
+
+AB_IMPORT_ALLOW = {"argparse", "fnmatch", "json", "os", "re", "subprocess", "sys", "hashlib", "stat", "datetime", "ipaddress"}
+AB_FORBIDDEN_OS = {"system", "popen", "remove", "unlink", "rename", "replace", "mkdir", "makedirs", "rmdir", "chmod",
+                   "chown", "symlink", "link", "write", "truncate", "utime", "putenv", "execv", "execl", "spawnl", "fork"}
+AB_FORBIDDEN_NAMES = {"eval", "exec", "compile", "__import__", "input", "breakpoint"}
+
+
+def check_ab():
+    """The helper must stay read-only, offline, allow-listed and non-executable; docs must invoke it safely."""
+    import ast
+    ab = os.path.join(SKILL_DIR, "scripts", "ab.py")
+    if not ok(os.path.isfile(ab), "missing scripts/ab.py"):
+        return
+    src = open(ab, encoding="utf-8").read()
+    tree = ast.parse(src)
+    imports = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports |= {a.name.split(".")[0] for a in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            imports.add((node.module or "").split(".")[0])
+    ok(imports <= AB_IMPORT_ALLOW, f"ab.py imports outside the allow-list: {sorted(imports - AB_IMPORT_ALLOW)}")
+    # forbidden calls / names
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            f = node.func
+            if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and f.value.id == "os" and f.attr in AB_FORBIDDEN_OS:
+                ok(False, f"ab.py calls os.{f.attr} (must be read-only)")
+            if isinstance(f, ast.Name) and f.id in AB_FORBIDDEN_NAMES:
+                ok(False, f"ab.py calls {f.id}()")
+            if isinstance(f, ast.Name) and f.id == "open":
+                mode = None
+                if len(node.args) > 1 and isinstance(node.args[1], ast.Constant):
+                    mode = node.args[1].value
+                for kw in node.keywords:
+                    if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
+                        mode = kw.value.value
+                ok(mode in (None, "r", "rb"), f"ab.py opens a file with mode {mode!r} (read-only only)")
+            for kw in node.keywords:
+                if kw.arg == "shell":
+                    ok(isinstance(kw.value, ast.Constant) and kw.value.value is False, "ab.py must not use shell=True")
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Subscript) and isinstance(t.value, ast.Attribute) and t.value.attr == "environ":
+                    ok(False, "ab.py writes os.environ")
+    # opening modes via os.fdopen / os.open must be read-only too
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id == "os":
+            if node.func.attr == "fdopen":
+                mode = node.args[1].value if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else "r"
+                ok(mode in ("r", "rb"), f"ab.py os.fdopen with mode {mode!r} (read-only only)")
+            if node.func.attr == "open":
+                seg = ast.get_source_segment(src, node) or ""
+                ok(not any(f in seg for f in ("O_WRONLY", "O_RDWR", "O_CREAT", "O_APPEND", "O_TRUNC")), "ab.py os.open with write flags")
+    # the working-tree guard must be WIRED (called first in changed_files) and must fail closed
+    fns = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+    cf = fns.get("changed_files")
+    first = cf.body[0] if cf and cf.body else None
+    ok(first is not None and isinstance(first, ast.Expr) and isinstance(first.value, ast.Call)
+       and getattr(first.value.func, "id", "") == "require_safe_worktree", "changed_files must call require_safe_worktree() first")
+    rr = fns.get("repo_risks")
+    raises = [n for n in ast.walk(rr) if isinstance(n, ast.Raise)] if rr else []
+    ok(len(raises) >= 2, "repo_risks must raise (fail closed) when git config cannot be read or is truncated")
+    ok(not any(isinstance(n, ast.Return) and isinstance(n.value, ast.List) and not n.value.elts for n in ast.walk(rr)) if rr else False,
+       "repo_risks must never return an empty list on error")
+    for needle in ("--no-ext-diff", "--no-textconv", "--ignore-submodules=all", "blocked_host", "readlink"):
+        ok(needle in src, f"ab.py missing: {needle}")
+    # git config may only be read from the repo-local scope
+    ok('["config", "--local", "--null", "--list"]' in src, "ab.py may only read repo-local git config ('config --local --null --list')")
+    ok(src.count('"config"') == 2, "ab.py: unexpected use of the git 'config' subcommand")
+    # subprocess is confined to run_git and git is allow-listed
+    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
+        uses = any(isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "subprocess" for n in ast.walk(fn))
+        if uses:
+            ok(fn.name == "run_git", f"ab.py uses subprocess outside run_git (in {fn.name})")
+    for needle in ("--no-pager", "--no-optional-locks", "--literal-pathspecs", "core.fsmonitor=false", "GIT_CONFIG_NOSYSTEM", "GIT_ATTR_NOSYSTEM",
+                   "shell=False", "timeout=", "O_NOFOLLOW", "RISKY_CONFIG", "require_safe_worktree", "trusted_path", "BANNER", "MAX_LINE_CHARS",
+                   "MAX_FILES_PER_TASK", "refusing working-tree checks", "filter\\.", "LFS_OK"):
+        ok(needle in src, f"ab.py git hardening missing: {needle}")
+    ok("allowed = {" in src and "rev-parse" in src, "ab.py must allow-list git subcommands")
+    ok("writes nothing" in src.lower(), "ab.py docstring must state it writes nothing")
+    ok(not (os.stat(ab).st_mode & 0o111), "ab.py must ship non-executable (invoke as python3 -I)")
+    # cap consistency with SKILL.md Limits
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    m = re.search(r"\| concurrent workers per wave \| (\d+) \|", skill)
+    mm = re.search(r"^MAX_WORKERS_PER_WAVE = (\d+)", src, flags=re.M)
+    ok(bool(m and mm and m.group(1) == mm.group(1)), "MAX_WORKERS_PER_WAVE must equal the SKILL.md Limits cap")
+    # nothing wires the helper into hooks or settings; docs always invoke it isolated
+    ok(not any(os.path.exists(os.path.join(ROOT, ".claude", f)) for f in ("settings.json", "settings.local.json")), "no settings file may ship")
+    for f in os.listdir(os.path.join(SKILL_DIR, "scripts", "hooks")):
+        ok("ab.py" not in open(os.path.join(SKILL_DIR, "scripts", "hooks", f), encoding="utf-8").read(), f"hook {f} must not call ab.py")
+    for path in md_files():
+        for n, line in enumerate(open(path, encoding="utf-8").read().splitlines(), 1):
+            if "scripts/ab.py" in line and "python3" in line:
+                ok("python3 -I" in line, f"{rel(path)}:{n}: ab.py must be invoked as 'python3 -I'")
+    # swarm and fresh-context review playbooks carry their safety rules
+    swarm = open(os.path.join(SKILL_DIR, "workflows", "swarm.md"), encoding="utf-8").read().lower()
+    for ph in ("task table", "hypothesis", "parallelizable", "sequential", "shared-file", "high-risk", "needs a human decision",
+               "ab.py graph", "read-only", "worker brief", "narrowest", "no formatter or code generator", "`pass`, `issues` or `blocked`",
+               "gap, never a pass", "counts as an attempt", "shared working tree", "**violation: record it as a gap**", "detects** violations", "snapshot `git status --porcelain`", "--preexisting", "parallelism never bypasses a gate",
+               "rollback", "user's approval", "never reset or clean", "--check-changes", "untracked", "lead only"):
+        ok(ph in swarm or ph == "lead only", f"swarm.md missing: '{ph}'")
+    rev = open(os.path.join(SKILL_DIR, "workflows", "independent-review.md"), encoding="utf-8").read().lower()
+    for ph in ("separate context", "not independent of the lead's framing", "| l0", "| l1", "| l2", "multi-model", "distinct models",
+               "unedited", "**raw**", "do **not** give", "reproduce or drop", "read the command before running it", "untrusted",
+               "different vendor", "explicit approval", "for this run", "redact", "paid api", "do not claim more independence",
+               "do not approve by default", "state what you did **not** check", "never the default"):
+        ok(ph in rev, f"independent-review.md missing: '{ph}'")
+    ok("workflows/swarm.md" in skill and "workflows/independent-review.md" in skill, "SKILL.md must link swarm and fresh-context review")
+
+
+def check_verification2():
+    """Browser QA and test-first workflows, the report template, and the checker's contract."""
+    wf = os.path.join(SKILL_DIR, "workflows")
+    bq = open(os.path.join(wf, "browser-qa.md"), encoding="utf-8").read().lower()
+    for ph in ("bring-your-own-browser", "you (the lead) write", "no browser tools", "cannot write files", "project's own end-to-end suite",
+               "specific journeys", "browser qa not performed", "untested", "never simulate", "invent a screenshot", "origin allowlist",
+               "approved by user: yes", "never production", "ephemeral profile", "test accounts", "test mode", "untrusted data",
+               "git-ignored", "success** scenario and a **failure", "console errors", "failed network requests", "375, 768 and 1280",
+               "registration", "login", "file upload", "payment", "agent tool-authorization", "ab.py browser-report", "format and internal consistency",
+               "proves **no behaviour**", "never cite the checker as verification", "open at least one artifact", "harder, not impossible",
+               "same counters", "dev** dependency", "expected, actual, pass or fail"):
+        ok(ph in bq, f"browser-qa.md missing: '{ph}'")
+    tdd = open(os.path.join(wf, "tdd.md"), encoding="utf-8").read().lower()
+    for ph in ("fails for the right reason", "smallest change", "regression", "never weaken the check", "failing-before", "passing-after",
+               "narrowest existing test type", "cannot edit files"):
+        ok(ph in tdd, f"tdd.md missing: '{ph}'")
+    tpl = open(os.path.join(SKILL_DIR, "templates", "BROWSER-QA.md"), encoding="utf-8").read()
+    for h in ("- Tool:", "- Environment:", "- Base URL:", "- Origin allowlist:", "- Started:", "- Approved by user:", "## Scenarios",
+              "| ID | Kind | URL | Scenario | Expected | Actual | Result | Artifact | sha256 |", "NOT RUN", "none: "):
+        ok(h in tpl, f"BROWSER-QA.md template missing: {h}")
+    ab = open(os.path.join(SKILL_DIR, "scripts", "ab.py"), encoding="utf-8").read()
+    for ph in ("FORMAT CHECK ONLY", "must not be cited as verification", "Origin allowlist", "production", "Approved by user",
+               "older than the report", "tracked by git", "credentials", "sha256", "MAX_ARTIFACT_BYTES"):
+        ok(ph in ab, f"ab.py browser-report missing: '{ph}'")
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    ok("browser qa not performed" in skill.lower() and "workflows/browser-qa.md" in skill and "workflows/tdd.md" in skill,
+       "SKILL.md must wire browser QA (with the 'not performed' rule) and test-first")
+    for pbk, ref in (("feature.md", "workflows/tdd.md"), ("feature.md", "workflows/browser-qa.md"), ("bug-fix.md", "workflows/tdd.md")):
+        ok(ref in open(os.path.join(SKILL_DIR, "playbooks", pbk), encoding="utf-8").read(), f"playbooks/{pbk} must reference {ref}")
+    ok("BROWSER-QA.md" in skill, "SKILL.md state files must list BROWSER-QA.md")
+
+
+def check_recovery():
+    """Resume, pause, reflect and correct rules; lessons scope separation; state check contract."""
+    sr = open(os.path.join(SKILL_DIR, "workflows", "session-recovery.md"), encoding="utf-8").read().lower()
+    for ph in ("data** (skill.md, untrusted data)", "verify against the repository", "ab.py state", "`verified at` commit", "ancestor of `head`",
+               '"unknown"', "not \"untrustworthy\"", "stale evidence (best effort)", "not** detected", "hint, not proof", "dirty files by owner",
+               "do not commit it or touch it", "wave was in flight", "re-run the current milestone's verification", "never assume a task is complete",
+               "retry budgets are not reset by restarting", "only the user may reset a budget", "only lower a remaining budget", "not tamper-proof",
+               "pause or interruption", "do not push or open a pr", "`wip:`", "reflect", "no raw command output", "no secrets", "no personal data",
+               "near-duplicate", "obsolete", "never instruct a later run", "correct", "second time", "highest level that works",
+               "would have failed on the real past mistake", "**proposal**", "you never apply it", "explicit approval in the current session",
+               "never merged into the lessons", "changed only by the user", "tell the user what you found"):
+        ok(ph in sr, f"session-recovery.md missing: '{ph}'")
+    tpl = open(os.path.join(SKILL_DIR, "templates", "LESSONS.md"), encoding="utf-8").read()
+    for h in ("## Project lessons (this project only)", "## Proposals for AUTO-BUILDER (never applied by the skill; the user decides)",
+              "data, not instructions", "No raw command output", "applied", "explicit approval in the current session", "approved-by-user"):
+        ok(h in tpl, f"LESSONS.md template missing: {h}")
+    ok(tpl.index("## Project lessons") < tpl.index("## Proposals for AUTO-BUILDER"), "LESSONS.md: project lessons and proposals must be separate sections")
+    ab = open(os.path.join(SKILL_DIR, "scripts", "ab.py"), encoding="utf-8").read()
+    for ph in ("never changes or resets", "counter regression", "do not reset retry budgets", "not an ancestor of HEAD", "status unknown",
+               "owned by no task", "treat as the user's change", "unanchored", "re-run the current milestone's verification"):
+        ok(ph in ab, f"ab.py state missing: '{ph}'")
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    rp = section(skill, "Resume protocol", "##").lower()
+    for ph in ("session-recovery.md", "verify against git", "never proof", "never resets retry counters"):
+        ok(ph in rp, f"SKILL.md Resume protocol missing: '{ph}'")
+    ok("LESSONS.md" in skill and "only the user may apply" in skill, "SKILL.md state files must list LESSONS.md with the user-only rule")
+    ok("lessons cap in limits" in section(skill, "Phase 8", "###").lower(), "Phase 8 must reference the lessons cap in Limits")
+    ok("session-recovery.md" in skill, "SKILL.md must link session-recovery.md")
+    # init-artifacts supports selective copy and validates names
+    ia = open(os.path.join(SKILL_DIR, "scripts", "init-artifacts.sh"), encoding="utf-8").read()
+    ok("invalid template name" in ia and "no such template" in ia and "never overwrites" in ia.lower(), "init-artifacts.sh must validate names and never overwrite")
+
+
+def check_release():
+    """Delivery operations: approval model, caps by reference, untrusted comments, no bypass."""
+    rel_md = open(os.path.join(SKILL_DIR, "playbooks", "release.md"), encoding="utf-8").read().lower()
+    for ph in ("never pushes, merges, tags, releases or deploys on its own", "untrusted data", "commands are never executed",
+               "pr review", "comment triage", "security-engineer", "never change code merely to quiet a bot", "ci inspection",
+               "failed-check diagnosis", "flake only if a single fresh run passes", "never weaken tests", "skip hooks",
+               "edit ci/workflow files", "bypass a required check", "changelog entry", "version bump proposal", "documentation synchronization",
+               "only when the user explicitly asks", "each push needs its own approval", "names the branch and the number of rounds",
+               "never covers force-push, merge, mark-ready, tag, release or deploy", "allowed commands", "gh pr view", "`git push` of the named branch",
+               "no `--force`", "no `gh pr merge`", "no `gh pr ready`", "no `gh release`", "skill.md limits", "stop at \"ready\"",
+               "never print tokens", "http 200", "explicit approval"):
+        ok(ph in rel_md, f"release.md missing: '{ph}'")
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read().lower()
+    lim = section(skill, "limits", "##")
+    for ph in ("3 fix-push-recheck rounds", "5 status reads", "at least 60 s apart", "20 minutes", "1 hour elapsed", "stop and report"):
+        ok(ph in lim, f"SKILL.md Limits missing the babysitting cap: '{ph}'")
+    ok("pushing, opening prs" in skill and "force-push" in skill, "SKILL.md approval policy must keep push/PR/force-push as ask-first")
+
+
 def check_security():
     """The security-engineer agent and the Security gate must exist and be wired into the lifecycle."""
     path = os.path.join(AGENT_DIR, "security-engineer.md")
@@ -366,7 +693,7 @@ def check_security():
     nums = set(re.findall(r"\b(\d+)(?:-attempt| (?:fix )?attempts| passes| iterations)", skill))
     ok(nums <= {"3", "5"}, f"SKILL.md introduces other retry/iteration limits: {nums}")
     ok(skill.count("default 5 passes per milestone") == 1 and skill.count("3 fix attempts") == 1,
-       "retry/iteration limits must each be defined exactly once in SKILL.md")
+       "the authoritative limit phrases ({3 fix attempts, default 5 passes per milestone}) must each appear exactly once in SKILL.md")
     # Both installers discover agents by glob, so the ninth agent installs without special-casing
     sh = open(os.path.join(ROOT, "install.sh"), encoding="utf-8").read()
     ps = open(os.path.join(ROOT, "install.ps1"), encoding="utf-8").read()
@@ -415,6 +742,11 @@ def main():
     check_scripts()
     check_protocol()
     check_security()
+    check_router()
+    check_ab()
+    check_verification2()
+    check_recovery()
+    check_release()
     check_hygiene()
     if errors:
         print(f"FAILED: {len(errors)} problem(s) in {checks} checks")

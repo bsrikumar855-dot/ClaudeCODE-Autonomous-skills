@@ -1,5 +1,7 @@
 # Parallel work and isolation
 
+The full procedure (task table, waves, worker contract, integration) is in `workflows/swarm.md`; this file keeps the isolation caveats.
+
 Parallelism costs integration effort. Use it only when tasks are independent.
 
 ## When to parallelise

@@ -5,6 +5,9 @@
 <div class="codeblock"><pre><code>/auto-builder Add a rate-limited, paginated /v1/orders API with tests. Reuse the existing stack. Do not deploy anything.</code></pre></div>
 <p>With no argument it inspects the repository and asks for one concise goal. Good goals state the outcome, constraints and what <em>not</em> to do. Useful phrases: "stop at the plan checkpoint", "no branch".</p>
 
+<h2 id="routing">How requests are routed</h2>
+<p>The lead first checks whether the request is trivial (a single file, no design, data, security or user-visible decision); if so it just does it and verifies it. Otherwise it restates your goal, classifies it (for example bug fix, new feature, refactoring, performance, security assessment, code review, research, documentation or release), tells you which playbook it chose in one sentence, and runs it. Say <code>route as &lt;category&gt;</code> to override. A new project runs the full lifecycle; every other category runs a shorter playbook inside one milestone of the task file, under the same limits and gates.</p>
+
 <h2 id="goals">Example goals</h2>
 <div class="table-wrap"><table><thead><tr><th scope="col">Category</th><th scope="col">Example</th></tr></thead><tbody>
 <tr><th scope="row">AI/ML app</th><td>Add semantic search over support articles with an evaluation set measuring recall@5</td></tr>

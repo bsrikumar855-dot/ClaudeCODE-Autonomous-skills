@@ -23,6 +23,9 @@ t "repo ships exactly nine agents"        test "$n_agents" -eq 9
 t "personal: all nine agents installed"  test "$(ls "$home/.claude/agents" | wc -l)" -eq "$n_agents"
 t "personal: security-engineer installed" test -f "$home/.claude/agents/security-engineer.md"
 t "personal: hook script stays executable" test -x "$home/.claude/skills/auto-builder/scripts/hooks/protect-secrets.sh"
+t "personal: all playbooks installed"     test "$(ls "$home/.claude/skills/auto-builder/playbooks" | wc -l)" -eq "$(ls "$repo/.claude/skills/auto-builder/playbooks" | wc -l)"
+t "personal: router + arena installed"   test -f "$home/.claude/skills/auto-builder/workflows/router.md" -a -f "$home/.claude/skills/auto-builder/workflows/arena.md"
+t "personal: principles installed"       test -f "$home/.claude/skills/auto-builder/principles/engineering-principles.md"
 t "personal: templates installed"        test -f "$home/.claude/skills/auto-builder/templates/TASKS.md"
 t "personal: no settings/CLAUDE.md written" bash -c "! ls '$home/.claude/settings.json' '$home/.claude/CLAUDE.md' 2>/dev/null"
 
@@ -77,6 +80,32 @@ t "init-artifacts: all templates copied" test "$(ls "$art/docs" | wc -l)" -eq "$
 echo keep > "$art/docs/TASKS.md"
 "$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh" "$art/docs" >/dev/null 2>&1
 t "init-artifacts: kept existing file" grep -q keep "$art/docs/TASKS.md"
+
+# --- helper script: installed non-executable, works from the installed location with cwd = user's project
+abi="$proj/.claude/skills/auto-builder/scripts/ab.py"
+t "helper installed" test -f "$abi"
+nt "helper installed non-executable" test -x "$abi"
+mkdir -p "$proj/docs/auto-builder"
+cat > "$proj/docs/auto-builder/TASKS.md" <<'TASKS'
+## Tasks
+
+| ID | Task | Milestone | Dependencies | Acceptance criteria | Verification | Status | Owner | Files owned | Flags |
+|---|---|---|---|---|---|---|---|---|---|
+| T1 | api | M1 | - | c | v | todo | backend-engineer | api/ | |
+| T2 | web | M1 | - | c | v | todo | frontend-engineer | web/ | |
+| T3 | e2e | M1 | T1,T2 | c | v | todo | qa-engineer | tests/ | |
+TASKS
+out="$( cd "$proj" && python3 -I "$abi" graph 2>&1 )"; rc=$?
+n=$((n+1)); if [ $rc -eq 0 ] && printf '%s' "$out" | grep -q "wave 1: T1, T2" && printf '%s' "$out" | grep -q "wave 2: T3"; then echo "ok   - installed helper computes waves from the project cwd"; else echo "FAIL - installed helper rc=$rc: $out"; fails=$((fails+1)); fi
+t "helper left the project tree unchanged (no files written)" test -z "$(cd "$proj" && find . -newer "$abi" -type f ! -path './docs/auto-builder/TASKS.md' ! -path './.claude/*' 2>/dev/null)"
+
+# --- selective init-artifacts
+sel="$tmp/sel"; mkdir -p "$sel"
+"$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh" "$sel/d" TASKS PROGRESS >/dev/null 2>&1
+t "init-artifacts selective: only the named templates" test "$(ls "$sel/d" | wc -l)" -eq 2
+nt "init-artifacts rejects an unknown template name"   "$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh" "$sel/d2" NOPE
+nt "init-artifacts rejects a path-like template name"  "$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh" "$sel/d3" "../../etc/passwd"
+t "init-artifacts: LESSONS.md and BROWSER-QA.md exist in all-templates mode" bash -c "'$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh' '$tmp/all' >/dev/null && test -f '$tmp/all/LESSONS.md' -a -f '$tmp/all/BROWSER-QA.md'"
 
 # --- hooks behave
 hook="$proj/.claude/skills/auto-builder/scripts/hooks/protect-secrets.sh"
