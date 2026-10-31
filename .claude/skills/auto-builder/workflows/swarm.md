@@ -23,7 +23,7 @@ Self-contained: the objective, the files and interfaces it owns, the expected ou
 
 ## 4. Integrate (waves run in the shared working tree; you commit only after the milestone gate)
 After each wave:
-1. Check the ownership claim against reality: `python3 -I ${CLAUDE_SKILL_DIR}/scripts/ab.py graph --check-changes --ids <wave task ids>` (or compare `git status` and `git diff --name-only` by hand, including untracked files). Any file outside the declared ownership, and any change under `docs/auto-builder/` or `.git/`, is a **violation: record it as a gap**, do not accept it silently.
+1. Check the ownership claim against reality. Before spawning, snapshot `git status --porcelain` (the user's own uncommitted work is not a worker violation). After the wave run `python3 -I ${CLAUDE_SKILL_DIR}/scripts/ab.py graph --check-changes --ids <wave task ids> --preexisting <paths from the snapshot>` (or compare `git status` and `git diff --name-only` by hand, including untracked files). Any file outside the declared ownership, and any change to `.git/`, is a **violation: record it as a gap**, do not accept it silently. A changed state file under `docs/auto-builder/` is a warning: only you write those, so confirm it was you. The helper **detects** violations after the fact; it does not prevent them, it does not look inside submodules, and it refuses working-tree checks in a repository whose own git configuration could run commands.
 2. Re-run only each worker's narrowest command to confirm its claim; the milestone gate covers the rest.
 3. Integrate serially (shared files last), then run the integration tests.
 4. Run the milestone gate: review and Security gate apply to the integrated result. **Parallelism never bypasses a gate.**

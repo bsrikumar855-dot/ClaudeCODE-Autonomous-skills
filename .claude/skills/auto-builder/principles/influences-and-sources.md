@@ -21,6 +21,10 @@ Explore → plan → implement → verify; skills for reusable workflows; subage
 - Hooks: https://code.claude.com/docs/en/hooks
 - Settings: https://code.claude.com/docs/en/settings
 
+## Ideas studied for the 2.0 architecture (ideas only; no text, prompts or code reused)
+
+Inspected 2026-10-31 at pinned commits: **pstack** by Lauren Tan (https://github.com/cursor/plugins/tree/c742dd61706fbacc1b95f1a20b7b988cf096ce6c/pstack, MIT), its Claude Code port **pstack-claude** by Michael Denyer (https://github.com/michael-denyer/pstack-claude/tree/5851c89613e2ddc3a6b7f4af02a42363b30ef8d3, MIT), and **gstack** by Garry Tan (https://github.com/garrytan/gstack/tree/047dad78ba757ebd6f29267f68a4695a7b002cbd, MIT). Mechanisms we adapted in our own wording: one router choosing a playbook; reproduce-or-drop adversarial review; "a gap is never a pass" worker reporting; single-writer ownership; testable exit conditions; verify-don't-trust session pickup; the enforcement hierarchy for repeated mistakes; premise challenge with decision tiers; evidence types and "verify first" restore rules; baseline-relative, bounded delivery checks. Details and what we deliberately did not adopt: `design/research/`. These projects are independent; none endorses AUTO-BUILDER.
+
 ## Attribution discipline
 
 These are engineering inspirations, not claims of endorsement. AUTO-BUILDER is an independent community project and is not affiliated with or endorsed by Anthropic, Boris Cherny or Andrej Karpathy. The interpretation of their public guidance here is ours and may be imperfect. Always check current Claude Code documentation before relying on a specific frontmatter field, hook event or tool name.

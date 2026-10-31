@@ -40,6 +40,12 @@ A full run (7 tasks × 2 arms × ≥5 repetitions) is on the order of 70 multi-h
 ## Protocol and statistics
 ≥5 runs per task per arm for the full study (more for noisy tasks); report per-task medians and the raw runs; confidence intervals or exact counts, not just means; pre-register the scoring rubric before any run; discard no run except for infrastructure failure (documented); report where 2.0 is worse (e.g. cost). Deliberately include tasks where routing/arena should *not* add ceremony, to detect over-engineering overhead.
 
+## Decision rule and blinding (to fix BEFORE any run)
+- **Adopt 2.0 only if**, over the Stage 1 tasks, the median hidden-acceptance pass rate on T1, T2 and T5 is at least as high as arm A **and** verification quality (claims reproduced by the scorer) is higher **and** the overhead on T0 (extra steps, tokens, time versus a bare Claude Code run and versus arm A) stays within a limit set in advance (suggested: no more than 25% more tokens than arm A on T0). Otherwise keep 1.x and simplify 2.0.
+- **"More review findings" is not better by itself:** score findings against a ground-truth defect list; count confirmed defects found, false positives and findings the arm's own review missed.
+- **Blind the scorer:** strip `docs/auto-builder/` state files, branches and report headings before scoring so arm B's artifacts do not identify the arm.
+- **Cost ceiling:** the user sets a token or usage ceiling before Stage 1; abort if exceeded.
+
 ## Results table (to be filled only from real runs)
 | Task | Metric | Arm A | Arm B | n | Notes |
 |---|---|---|---|---|---|

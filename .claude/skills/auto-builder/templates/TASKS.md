@@ -26,7 +26,7 @@
 
 ## Tasks
 
-Strict grammar (tools parse this table and fail loudly on anything else): `Dependencies` = comma-separated task IDs or `-`; `Files owned` = comma-separated repo-relative paths, directories or globs (no `..`, no absolute paths, no match-everything globs); `Flags` = comma-separated from `high-risk`, `human-decision`, `shared-file`, or empty (a missing `Flags` column means none).
+Allowed values: `Status` is `todo`, `in progress` or `done`; `Gate passed` is `yes` or `no`; `Failing checks → attempts` uses `<check> → <n>`. Strict grammar (tools parse this table and fail loudly on anything else; escape a literal pipe inside a cell as `\|`, and backticks around paths are tolerated): `Dependencies` = comma-separated task IDs or `-`; `Files owned` = comma-separated repo-relative paths, directories or globs (no `..`, no absolute paths, no match-everything globs); `Flags` = comma-separated from `high-risk`, `human-decision`, `shared-file`, or empty (a missing `Flags` column means none).
 
 | ID | Task | Milestone | Dependencies | Acceptance criteria | Verification | Status | Owner | Files owned | Flags |
 |---|---|---|---|---|---|---|---|---|---|

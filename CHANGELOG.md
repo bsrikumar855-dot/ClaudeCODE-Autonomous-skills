@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Format based on [Keep a
 
 ## [0.1.0] - Unreleased
 
+### Added (AUTO-BUILDER 2.0 architecture)
+- **Task router** (12 categories, trivial bypass, add-only gates) with `workflows/router.md` and 8 short playbooks; routing eval set (`tests/fixtures/routing-eval.json`, labelled NOT RUN).
+- Normative **Untrusted-data** rule, a single **Limits** section, per-milestone `Verified at` and `Flags` in the `TASKS.md` template.
+- Product interrogation (in `discovery.md`), architecture arena (cheap by default), engineering principles P01–P13.
+- Dependency-aware **swarm** workflow and fresh-context review workflow; **browser QA** (bring-your-own-browser, evidence template) and test-first workflow; **session recovery**, reflect/correct and `LESSONS.md`; opt-in PR/CI/release playbook with a strict approval model.
+- Optional read-only helper `scripts/ab.py` (`graph`, `state`, `browser-report`), shipped non-executable, with hostile-input tests; selective `init-artifacts.sh`.
+- Research and reviewed design under `design/` (pstack and gstack audits at pinned commits, gap analysis, three independent design reviews, honest implementation status, benchmark plan that is **not run**).
+- Deliberate-breakage test suite (mutations reported by kind: behaviour, static and wording guards), `tests/run-all.sh`, and CI steps for them.
+- Post-implementation reviews found and fixed: a confirmed code-execution path in the helper (repo-local git clean filters; the helper now refuses working-tree git operations when the repository's own git configuration defines commands), a ReDoS, output-injection and git-lookup issues, and several parser/overhead/contradiction problems (see `design/architecture/IMPLEMENTATION-REVIEW-LOG.md`). A final security re-check is recorded there and in the PR.
+- Agents, installers and LICENSE unchanged. No live validation; no measured improvement is claimed.
+
 ### Added (security engineer)
 - **`security-engineer` agent** (9th specialist; read-only, Bash for non-destructive checks, no web tools): threat modeling, OWASP Top 10, authn/authz, API, injection, XSS/CSRF/SSRF, secrets, dependencies, database, privacy, uploads, deployment config, AI/LLM security, security regression tests; evidence-based findings rated Critical/High/Medium/Low.
 - **Security gate** in `SKILL.md` and `workflows/security.md`: risk-based invocation at architecture, relevant milestones and before completion; Critical blocks completion and cannot be accepted (a Potential Critical blocks the same way); High needs a fix or explicit user acceptance, and an accepted High stays recorded as open residual risk, never as fixed; Medium/Low tracked; never silently ignored; reports distinguish static inspection, automated scanning and penetration testing (not performed unless authorized); no "secure" claims.

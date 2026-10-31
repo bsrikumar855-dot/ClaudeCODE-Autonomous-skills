@@ -8,7 +8,7 @@ Runs inside one milestone row of `TASKS.md`; uses its counters, the Quality prot
 3. Plan: tasks with dependencies and owned files (task graph); arena only if a hard-to-reverse design decision exists (`workflows/arena.md`).
 4. Implement slice by slice, tests first for each acceptance criterion where practical (`workflows/tdd.md`); follow existing conventions.
 5. Verify: tests, regression, real user path (browser QA, `workflows/browser-qa.md`, if there is a UI), Security gate if triggered.
-6. Review: fresh-context reviewer on the integrated result.
+6. Review per Quality protocol item 3: a fresh-context reviewer on the integrated result (for a small change your own pass, disclosed as not independent).
 7. Update docs and state files; report verified / partially verified / untested.
 
 ## Principles

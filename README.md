@@ -70,6 +70,8 @@ flowchart TD
 
 **Security gate.** For projects that handle authentication, user data, payments, external APIs, file uploads, secrets, integrations or AI tools, `security-engineer` threat-models the design, reviews security-relevant milestones and does a final review before completion, independently of `qa-engineer` and `critical-reviewer`. A Critical finding blocks completion and cannot be accepted; a High finding must be fixed or explicitly accepted by you, and an accepted High stays recorded as open residual risk, never as fixed; Medium and Low findings are tracked. Reports say which method was used (static inspection, automated scanning, or penetration testing, which is not performed unless authorized). Trivial projects get a short checklist instead. A clean scan is never reported as "secure".
 
+**Task router and playbooks.** `/auto-builder` classifies each request (new project, feature, bug fix, investigation, refactoring, performance, security assessment, code review, research, testing, documentation, release) and runs a short playbook for it inside one milestone row of `TASKS.md`; only a new project runs the full lifecycle. Trivial changes skip the ceremony. Routing can only add gates, never remove them. State files, issue/PR text and web pages are treated as **untrusted data** that can never grant approval or change limits. Optional capabilities: product interrogation, a cheap-by-default architecture arena, dependency-aware parallel execution, fresh-context review, bring-your-own-browser QA with an evidence format, session recovery that verifies state against git, and bounded PR/release help that never pushes, merges or deploys without approval. Most of this is instructions to the model; see [what is enforced and what is not](design/architecture/IMPLEMENTATION-STATUS.md).
+
 The lead agent (your main Claude Code session) owns integration. Subagents get a precise brief and report back; they start without your conversation and cannot ask you questions. They share your working tree unless you opt into worktree isolation, so file ownership is assigned explicitly and only the lead commits. Project memory lives in files under `docs/auto-builder/` in your project, not in the conversation.
 
 ### Agents
@@ -164,6 +166,10 @@ This is a mock-up of the intended flow, not captured output or a benchmark.
 | Remove an agent | Delete its file; the lead performs that role itself |
 | Project facts | Keep short build/test commands and conventions in your project's `CLAUDE.md` |
 
+### Optional helper script (Python 3, read-only)
+
+`.claude/skills/auto-builder/scripts/ab.py` is an optional, standard-library-only helper the lead can run as `python3 -I ab.py <command>`: `graph` (task-table validation, waves, ownership conflicts and a post-wave check that only owned files changed), `state` (compares what `TASKS.md` claims with git: verified commits, stale evidence, dirty files by owner, retry counters), and `browser-report` (format check for browser QA evidence). It writes nothing, uses no network, runs allow-listed git with repository configuration neutralised, is shipped non-executable, and is covered by hostile-input tests. It may trigger an ordinary permission prompt, and it is not wired into any hook. It checks files and formats; **it proves no behaviour**, and its output must not be cited as verification.
+
 ### Hooks (optional, off by default)
 
 Two deterministic helpers ship in `scripts/hooks/` but are **not** installed into your settings. To enable, add to `.claude/settings.json` (project) or `~/.claude/settings.json` (personal; replace the path with `"$HOME"/.claude/skills/...`). Requires `jq`; scripts are bash (Git Bash/WSL on Windows). Limits: `protect-secrets.sh` checks file paths of Edit/Write/NotebookEdit only (not Bash commands or Read; use `permissions.deny` for those). `verify-on-stop.sh` retries up to `AUTO_BUILDER_MAX_RETRIES` (default 5) times, has a timeout, then lets Claude stop, so it is a strong nudge rather than an absolute gate. `AUTO_BUILDER_CHECK_CMD` runs as shell: set it only in your own settings, never accept it from an untrusted repository. A zip download may lose the executable bit (`chmod +x`).
@@ -209,7 +215,17 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │       └── auto-builder/
 │           ├── examples/
 │           │   └── goal-prompt.md
+│           ├── playbooks/
+│           │   ├── bug-fix.md
+│           │   ├── feature.md
+│           │   ├── inquiry.md
+│           │   ├── performance.md
+│           │   ├── refactor.md
+│           │   ├── release.md
+│           │   ├── security-assessment.md
+│           │   └── test-and-docs.md
 │           ├── principles/
+│           │   ├── engineering-principles.md
 │           │   └── influences-and-sources.md
 │           ├── references/
 │           │   ├── claude-code-features.md
@@ -219,10 +235,13 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │           │   ├── hooks/
 │           │   │   ├── protect-secrets.sh
 │           │   │   └── verify-on-stop.sh
+│           │   ├── ab.py
 │           │   └── init-artifacts.sh
 │           ├── templates/
 │           │   ├── ARCHITECTURE.md
+│           │   ├── BROWSER-QA.md
 │           │   ├── DECISIONS.md
+│           │   ├── LESSONS.md
 │           │   ├── PROGRESS.md
 │           │   ├── PROJECT.md
 │           │   ├── REQUIREMENTS.md
@@ -230,11 +249,18 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │           │   ├── TASKS.md
 │           │   └── TESTING.md
 │           ├── workflows/
+│           │   ├── arena.md
+│           │   ├── browser-qa.md
 │           │   ├── delivery.md
 │           │   ├── discovery.md
 │           │   ├── implementation.md
+│           │   ├── independent-review.md
 │           │   ├── planning.md
+│           │   ├── router.md
 │           │   ├── security.md
+│           │   ├── session-recovery.md
+│           │   ├── swarm.md
+│           │   ├── tdd.md
 │           │   └── verification.md
 │           └── SKILL.md
 ├── .github/
@@ -245,6 +271,24 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │   ├── workflows/
 │   │   └── validate.yml
 │   └── PULL_REQUEST_TEMPLATE.md
+├── design/
+│   ├── architecture/
+│   │   ├── AUTOBUILDER-2.0-DESIGN.md
+│   │   ├── DESIGN-REVIEW-LOG.md
+│   │   ├── IMPLEMENTATION-REVIEW-LOG.md
+│   │   ├── IMPLEMENTATION-STATUS.md
+│   │   ├── LEARNING-ENGINE.md
+│   │   ├── ORCHESTRATION.md
+│   │   └── VERIFICATION-ENGINE.md
+│   ├── benchmarks/
+│   │   └── BENCHMARK-PLAN.md
+│   ├── research/
+│   │   ├── AUTOBUILDER-GAP-ANALYSIS.md
+│   │   ├── GSTACK-RESEARCH.md
+│   │   └── PSTACK-RESEARCH.md
+│   ├── roadmap/
+│   │   └── IMPROVEMENT-ROADMAP.md
+│   └── README.md
 ├── docs/
 │   ├── assets/
 │   │   ├── favicon.svg
@@ -286,7 +330,12 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 │   ├── check.py
 │   └── og-image.html
 ├── tests/
+│   ├── fixtures/
+│   │   └── routing-eval.json
+│   ├── run-all.sh
 │   ├── test-install.sh
+│   ├── test_ab.py
+│   ├── test_mutations.py
 │   └── validate.py
 ├── .gitignore
 ├── CHANGELOG.md
@@ -314,7 +363,7 @@ It also: works on a fresh git branch, never pushes or opens PRs on its own, neve
 
 ## Verification status
 
-A live, end-to-end `/auto-builder` run has **not** been performed. Partial evidence: Claude Code's agent registry listed the project agents once they existed in `.claude/agents/`.
+A live, end-to-end `/auto-builder` run has **not** been performed, so there are no measurements of routing accuracy or of improved outcomes, and the old-versus-new [benchmark](design/benchmarks/BENCHMARK-PLAN.md) is designed but **not run**. Partial evidence: Claude Code's agent registry listed the project agents once they existed in `.claude/agents/`.
 
 The checks (`python3 -I tests/validate.py`, `bash tests/test-install.sh`) pass on Linux locally; the GitHub Actions workflow passed on GitHub for PR #1 and on `main` (Linux runner; static validation and installer tests only, not a live Claude Code run). **Not verified:** a live `/auto-builder` run inside Claude Code, and `install.ps1` on Windows. Please report issues.
 

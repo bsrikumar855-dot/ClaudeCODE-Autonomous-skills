@@ -1,6 +1,6 @@
 # AUTO-BUILDER 2.0: design (v1.1, after review)
 
-Status: **design, pre-implementation** (end of Milestone 1). Evidence: [PSTACK](../research/PSTACK-RESEARCH.md), [GSTACK](../research/GSTACK-RESEARCH.md), [gap analysis](../research/AUTOBUILDER-GAP-ANALYSIS.md). Review outcome: [DESIGN-REVIEW-LOG](DESIGN-REVIEW-LOG.md) (the first draft was reviewed by three fresh-context agents; this version incorporates their findings).
+Status: **implemented through Milestone 7 (instructions, helper and tests; not run live)**. Original text below is the reviewed design as of Milestone 1; see [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md) for what actually exists and [IMPLEMENTATION-REVIEW-LOG](IMPLEMENTATION-REVIEW-LOG.md) for the post-implementation review. Evidence: [PSTACK](../research/PSTACK-RESEARCH.md), [GSTACK](../research/GSTACK-RESEARCH.md), [gap analysis](../research/AUTOBUILDER-GAP-ANALYSIS.md). Review outcome: [DESIGN-REVIEW-LOG](DESIGN-REVIEW-LOG.md) (the first draft was reviewed by three fresh-context agents; this version incorporates their findings).
 
 ## 1. Goal and non-goals
 **Goal:** better engineering outcomes from the same nine agents: route each task to the right flow, challenge weak requirements early, compare designs when it matters, run independent work in parallel *safely*, verify with evidence that is hard to fake, and resume or learn across sessions without trusting stale or hostile state.

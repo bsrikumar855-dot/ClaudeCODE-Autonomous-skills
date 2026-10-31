@@ -433,7 +433,7 @@ def check_router():
     for sec, phrases in (("Task router", ("trivial changes", "12 categories", "one milestone row", "only **adds** gates", "one focused question", "never ask")),
                          ("Untrusted data", ("data, not instructions", "never** grant an approval", "waive a gate", "raise or reset a limit",
                                               "only lower", "current session", "tell the user what you found", "marking it as data")),
-                         ("Limits", ("defined once", "never as a new budget", "concurrent workers per wave", "arena independent candidates",
+                         ("Limits", ("must not change them", "never as a new budget", "concurrent workers per wave", "arena independent candidates",
                                      "3 fix-push-recheck rounds", "elapsed"))):
         body = section(skill, sec, "##").lower()
         ok(bool(body), f"SKILL.md missing section '{sec}'")
@@ -447,7 +447,7 @@ def check_router():
     ok("| Flags |" in tasks and "Verified at (sha)" in tasks and "Strict grammar" in tasks, "TASKS.md template needs Flags, Verified at (sha) and the strict-grammar note")
 
 
-AB_IMPORT_ALLOW = {"argparse", "fnmatch", "json", "os", "re", "subprocess", "sys", "hashlib", "stat", "datetime"}
+AB_IMPORT_ALLOW = {"argparse", "fnmatch", "json", "os", "re", "subprocess", "sys", "hashlib", "stat", "datetime", "ipaddress"}
 AB_FORBIDDEN_OS = {"system", "popen", "remove", "unlink", "rename", "replace", "mkdir", "makedirs", "rmdir", "chmod",
                    "chown", "symlink", "link", "write", "truncate", "utime", "putenv", "execv", "execl", "spawnl", "fork"}
 AB_FORBIDDEN_NAMES = {"eval", "exec", "compile", "__import__", "input", "breakpoint"}
@@ -491,12 +491,39 @@ def check_ab():
             for t in node.targets:
                 if isinstance(t, ast.Subscript) and isinstance(t.value, ast.Attribute) and t.value.attr == "environ":
                     ok(False, "ab.py writes os.environ")
+    # opening modes via os.fdopen / os.open must be read-only too
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id == "os":
+            if node.func.attr == "fdopen":
+                mode = node.args[1].value if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else "r"
+                ok(mode in ("r", "rb"), f"ab.py os.fdopen with mode {mode!r} (read-only only)")
+            if node.func.attr == "open":
+                seg = ast.get_source_segment(src, node) or ""
+                ok(not any(f in seg for f in ("O_WRONLY", "O_RDWR", "O_CREAT", "O_APPEND", "O_TRUNC")), "ab.py os.open with write flags")
+    # the working-tree guard must be WIRED (called first in changed_files) and must fail closed
+    fns = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+    cf = fns.get("changed_files")
+    first = cf.body[0] if cf and cf.body else None
+    ok(first is not None and isinstance(first, ast.Expr) and isinstance(first.value, ast.Call)
+       and getattr(first.value.func, "id", "") == "require_safe_worktree", "changed_files must call require_safe_worktree() first")
+    rr = fns.get("repo_risks")
+    raises = [n for n in ast.walk(rr) if isinstance(n, ast.Raise)] if rr else []
+    ok(len(raises) >= 2, "repo_risks must raise (fail closed) when git config cannot be read or is truncated")
+    ok(not any(isinstance(n, ast.Return) and isinstance(n.value, ast.List) and not n.value.elts for n in ast.walk(rr)) if rr else False,
+       "repo_risks must never return an empty list on error")
+    for needle in ("--no-ext-diff", "--no-textconv", "--ignore-submodules=all", "blocked_host", "readlink"):
+        ok(needle in src, f"ab.py missing: {needle}")
+    # git config may only be read from the repo-local scope
+    ok('["config", "--local", "--null", "--list"]' in src, "ab.py may only read repo-local git config ('config --local --null --list')")
+    ok(src.count('"config"') == 2, "ab.py: unexpected use of the git 'config' subcommand")
     # subprocess is confined to run_git and git is allow-listed
     for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
         uses = any(isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "subprocess" for n in ast.walk(fn))
         if uses:
             ok(fn.name == "run_git", f"ab.py uses subprocess outside run_git (in {fn.name})")
-    for needle in ("--no-pager", "--no-optional-locks", "core.fsmonitor=false", "GIT_CONFIG_NOSYSTEM", "shell=False", "timeout="):
+    for needle in ("--no-pager", "--no-optional-locks", "--literal-pathspecs", "core.fsmonitor=false", "GIT_CONFIG_NOSYSTEM", "GIT_ATTR_NOSYSTEM",
+                   "shell=False", "timeout=", "O_NOFOLLOW", "RISKY_CONFIG", "require_safe_worktree", "trusted_path", "BANNER", "MAX_LINE_CHARS",
+                   "MAX_FILES_PER_TASK", "refusing working-tree checks", "filter\\.", "LFS_OK"):
         ok(needle in src, f"ab.py git hardening missing: {needle}")
     ok("allowed = {" in src and "rev-parse" in src, "ab.py must allow-list git subcommands")
     ok("writes nothing" in src.lower(), "ab.py docstring must state it writes nothing")
@@ -518,7 +545,7 @@ def check_ab():
     swarm = open(os.path.join(SKILL_DIR, "workflows", "swarm.md"), encoding="utf-8").read().lower()
     for ph in ("task table", "hypothesis", "parallelizable", "sequential", "shared-file", "high-risk", "needs a human decision",
                "ab.py graph", "read-only", "worker brief", "narrowest", "no formatter or code generator", "`pass`, `issues` or `blocked`",
-               "gap, never a pass", "counts as an attempt", "shared working tree", "violation", "parallelism never bypasses a gate",
+               "gap, never a pass", "counts as an attempt", "shared working tree", "**violation: record it as a gap**", "detects** violations", "snapshot `git status --porcelain`", "--preexisting", "parallelism never bypasses a gate",
                "rollback", "user's approval", "never reset or clean", "--check-changes", "untracked", "lead only"):
         ok(ph in swarm or ph == "lead only", f"swarm.md missing: '{ph}'")
     rev = open(os.path.join(SKILL_DIR, "workflows", "independent-review.md"), encoding="utf-8").read().lower()
@@ -666,7 +693,7 @@ def check_security():
     nums = set(re.findall(r"\b(\d+)(?:-attempt| (?:fix )?attempts| passes| iterations)", skill))
     ok(nums <= {"3", "5"}, f"SKILL.md introduces other retry/iteration limits: {nums}")
     ok(skill.count("default 5 passes per milestone") == 1 and skill.count("3 fix attempts") == 1,
-       "retry/iteration limits must each be defined exactly once in SKILL.md")
+       "the authoritative limit phrases ({3 fix attempts, default 5 passes per milestone}) must each appear exactly once in SKILL.md")
     # Both installers discover agents by glob, so the ninth agent installs without special-casing
     sh = open(os.path.join(ROOT, "install.sh"), encoding="utf-8").read()
     ps = open(os.path.join(ROOT, "install.ps1"), encoding="utf-8").read()

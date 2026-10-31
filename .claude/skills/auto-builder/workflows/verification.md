@@ -15,7 +15,7 @@ Run commands from the repository's documented scripts. Capture exact pass/fail o
 
 ## Milestone gate checklist
 
-Copy into the milestone's row in `TASKS.md` and tick only what actually happened. Do not start the next milestone until every applicable box is ticked and no blocker/major finding is open.
+Use as the checklist for the milestone's gate (record the results in the gate table columns, or in `PROGRESS.md` for a small change) and tick only what actually happened. Do not start the next milestone until every applicable box is ticked and no blocker/major finding is open.
 
 - [ ] Expected outcome and acceptance criteria were written *before* implementing
 - [ ] Relevant tests run (command + result recorded)
