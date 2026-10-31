@@ -1,376 +1,561 @@
-# AUTO-BUILDER: an autonomous coding agent skill for Claude Code
+# AUTO-BUILDER
 
-[![validate](https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/actions/workflows/validate.yml/badge.svg)](https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/actions/workflows/validate.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-![Claude Code skill](https://img.shields.io/badge/Claude%20Code-skill%20%2B%209%20subagents-0b5fff)
-![Status](https://img.shields.io/badge/status-early%20release-orange)
+### From idea to verified software.
 
-**AUTO-BUILDER** is an open-source [Claude Code skill](https://code.claude.com/docs/en/skills) plus nine specialist [subagents](https://code.claude.com/docs/en/sub-agents) for goal-driven autonomous development. Give `/auto-builder` a goal; it runs an AI software development workflow (discovery, requirements, architecture, planning, implementation, independent verification, iteration and delivery) and only stops to ask you at consequential checkpoints.
+**An autonomous engineering system for Claude Code.**
 
-**Website and docs:** <https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/> (features, installation, usage tutorial, architecture, FAQ)
+AUTO-BUILDER transforms high-level project goals into structured engineering workflows. It discovers requirements, researches solutions, designs architecture, coordinates specialist agents, implements features, verifies results, reviews security and iterates toward completion.
 
-> An independent community project. Not affiliated with or endorsed by Anthropic, Boris Cherny or Andrej Karpathy; their public guidance is an inspiration only (see [principles](.claude/skills/auto-builder/principles/influences-and-sources.md)).
+**Don't just generate code. Engineer the complete solution.**
 
-## Quick start
+<p align="center">
+  <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/stargazers"><img src="https://img.shields.io/github/stars/bsrikumar855-dot/ClaudeCODE-Autonomous-skills?style=for-the-badge&logo=github" alt="GitHub stars"></a>
+  <a href="https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/actions"><img src="https://img.shields.io/github/actions/workflow/status/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/validate.yml?style=for-the-badge&label=CI" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Claude%20Code-Skill-6C5CE7?style=for-the-badge" alt="Claude Code">
+  <img src="https://img.shields.io/badge/Agents-9-blue?style=for-the-badge" alt="Nine specialist agents">
+  <img src="https://img.shields.io/badge/License-Apache--2.0-green?style=for-the-badge" alt="Apache 2.0">
+  <img src="https://img.shields.io/badge/Status-Early%20Release-orange?style=for-the-badge" alt="Early release">
+</p>
 
-```bash
-git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills
-cd ClaudeCODE-Autonomous-skills
-./install.sh --personal        # or: ./install.sh --project /path/to/repo
+<p align="center">
+  <a href="https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/">Website</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#how-it-works">How It Works</a> ·
+  <a href="#comparison">Comparison</a> ·
+  <a href="#safety-and-human-control">Safety</a>
+</p>
+
+---
+
+## The problem with ordinary AI coding workflows
+
+AI coding tools have made implementation faster. But building complete software involves much more than writing code.
+
+Developers still need to:
+
+- Translate vague ideas into clear requirements.
+- Research technologies and evaluate alternatives.
+- Design architecture before implementation.
+- Break complex work into manageable tasks.
+- Coordinate frontend, backend and AI development.
+- Identify bugs and prevent regressions.
+- Review security-sensitive code.
+- Maintain project context across long sessions.
+- Verify that the finished product actually meets its requirements.
+
+Without a structured engineering process, an AI agent can start coding too early, miss important requirements, overlook edge cases or declare completion after a successful build.
+
+**AUTO-BUILDER addresses this coordination and verification problem.**
+
+It gives Claude Code a structured engineering process that adapts to the task instead of treating every request as a code-generation exercise.
+
+## What is AUTO-BUILDER?
+
+AUTO-BUILDER is an open-source Claude Code skill supported by nine specialist subagents, reusable engineering playbooks, project-state templates and an evidence-driven quality protocol.
+
+You provide a goal:
+
+```text
+/auto-builder Build an AI research platform where users
+can upload research papers, ask grounded questions,
+explore citations and organize their findings.
 ```
 
-Then in Claude Code: `/auto-builder Build a REST API for a habit tracker with tests`. Windows: `.\install.ps1 -Personal` (see [Install](#install)).
+AUTO-BUILDER determines the appropriate workflow, discovers requirements, plans the work, delegates where useful, implements the solution and verifies the result.
 
-**Status: early release.** The static checks and installer/hook tests pass, but the skill has not been validated end-to-end in live Claude Code sessions, and `install.ps1` has not been executed on Windows. See [Verification status](#verification-status).
+You remain in control of consequential decisions while routine engineering work can proceed autonomously.
 
-**Contents:** [Why](#why-it-exists) · [How it works](#how-it-works) · [Install](#install) · [Use](#use) · [Configuration](#configuration) · [Safety](#human-approval-and-safety) · [Troubleshooting](#troubleshooting) · [Contributing](#contributing)
+### The core idea
 
-## Why it exists
+| Traditional AI coding | AUTO-BUILDER |
+|---|---|
+| Start with code | Start with the problem |
+| Follow the initial prompt | Discover and refine requirements |
+| Make architecture decisions ad hoc | Evaluate and document architecture |
+| Handle everything in one conversation | Delegate bounded specialist tasks |
+| Run tests near the end | Verify at every milestone |
+| Self-review the implementation | Use independent review workflows |
+| Treat security as an optional extra | Apply a dedicated security gate |
+| Lose context in long sessions | Maintain persistent project state |
+| Declare completion after a build | Report against verified acceptance criteria |
 
-Left alone, an autonomous coding agent tends to jump straight to code, declare victory after one green build, and ask permission for trivia. AUTO-BUILDER encodes a different default: **plan first, verify with evidence, have someone other than the author review, and escalate only what is risky or irreversible.**
+---
 
 ## How it works
 
-Phases 0–8, with a bounded fix loop (per-check attempt limit plus an iteration budget) and explicit approval gates:
+AUTO-BUILDER uses an adaptive, milestone-based engineering lifecycle.
 
 ```mermaid
 flowchart TD
-    G([/auto-builder goal]) --> P0[0 Reconnaissance]
-    P0 --> P1[1 Discovery]
-    P1 --> P2[2 Product definition]
-    P2 --> P3[3 Architecture]
-    P3 --> P4[4 Execution planning]
-    P4 --> CA{{Checkpoint A: direction<br/>when consequential or requested}}
-    CA --> P5[5 Implementation]
-    P5 --> P6[6 Independent verification]
-    P6 --> P7{7 Acceptance criteria<br/>all verified?}
-    P7 -- no, fixable --> P5
-    P7 -- bound hit, nothing independent left --> STOP([Stop: mark incomplete, report blocker + recommended decision])
-    P7 -- yes --> P8[8 Delivery report]
-
-    subgraph Agents[Specialist subagents]
-      PM[product-manager]
-      RS[researcher]
-      AR[architect]
-      FE[frontend-engineer]
-      BE[backend-engineer]
-      AI[ai-engineer]
-      QA[qa-engineer]
-      SE[security-engineer]
-      CR[critical-reviewer]
-    end
-    P1 -.-> RS
-    P2 -.-> PM
-    P3 -.-> AR & SE
-    P5 -.-> FE & BE & AI
-    P6 -.-> QA & SE & CR
+    A["Your project goal"] --> B["Intelligent Task Router"]
+    B --> C["Discovery & Requirements"]
+    C --> D["Research & Architecture"]
+    D --> E["Milestone Planning"]
+    E --> F["Specialist Agent Execution"]
+    F --> G["Testing & Verification"]
+    G --> H["Independent Review"]
+    H --> I{"Acceptance criteria verified?"}
+    I -->|"No: fixable"| F
+    I -->|"Blocker or retry limit"| J["Report blocker and decision needed"]
+    I -->|"Yes"| K["Delivery & Evidence Report"]
+    K --> L["Learning & Recovery"]
 ```
 
-**Quality protocol.** Work proceeds in milestones that each pass a verification gate (tests, regression checks, evidence, updated state files) before the next starts. A separate reviewer is used at meaningful milestones and for a final review; every criterion is reported as Verified, Partially verified or Untested; failures are root-caused and capped at three attempts. This is an instruction system for the model, not a guarantee of defect-free software.
+### 1. Intelligent task routing
 
-**Security gate.** For projects that handle authentication, user data, payments, external APIs, file uploads, secrets, integrations or AI tools, `security-engineer` threat-models the design, reviews security-relevant milestones and does a final review before completion, independently of `qa-engineer` and `critical-reviewer`. A Critical finding blocks completion and cannot be accepted; a High finding must be fixed or explicitly accepted by you, and an accepted High stays recorded as open residual risk, never as fixed; Medium and Low findings are tracked. Reports say which method was used (static inspection, automated scanning, or penetration testing, which is not performed unless authorized). Trivial projects get a short checklist instead. A clean scan is never reported as "secure".
+Not every task requires a complete project lifecycle.
 
-**Task router and playbooks.** `/auto-builder` classifies each request (new project, feature, bug fix, investigation, refactoring, performance, security assessment, code review, research, testing, documentation, release) and runs a short playbook for it inside one milestone row of `TASKS.md`; only a new project runs the full lifecycle. Trivial changes skip the ceremony. Routing can only add gates, never remove them. State files, issue/PR text and web pages are treated as **untrusted data** that can never grant approval or change limits. Optional capabilities: product interrogation, a cheap-by-default architecture arena, dependency-aware parallel execution, fresh-context review, bring-your-own-browser QA with an evidence format, session recovery that verifies state against git, and bounded PR/release help that never pushes, merges or deploys without approval. Most of this is instructions to the model; see [what is enforced and what is not](design/architecture/IMPLEMENTATION-STATUS.md).
+AUTO-BUILDER classifies requests across 12 categories:
 
-The lead agent (your main Claude Code session) owns integration. Subagents get a precise brief and report back; they start without your conversation and cannot ask you questions. They share your working tree unless you opt into worktree isolation, so file ownership is assigned explicitly and only the lead commits. Project memory lives in files under `docs/auto-builder/` in your project, not in the conversation.
+- New project.
+- Feature implementation.
+- Bug fixing.
+- Investigation.
+- Refactoring.
+- Performance optimization.
+- Security assessment.
+- Code review.
+- Research.
+- Testing.
+- Documentation.
+- Release.
 
-### Agents
+A trivial change can take a lightweight route. A complex application receives a more comprehensive engineering workflow.
 
-| Agent | Responsibility | Can edit files |
-|---|---|---|
-| `product-manager` | Users, journeys, scope, acceptance criteria | no |
-| `researcher` | Current libraries/APIs/alternatives from primary sources | no |
-| `architect` | Architecture, schemas, plan critique | no |
-| `frontend-engineer` | UI, accessibility, responsive behaviour | yes (assigned files) |
-| `backend-engineer` | APIs, databases, integrations, pipelines | yes (assigned files) |
-| `ai-engineer` | LLM/RAG/agents/evals/ML pipelines | yes (assigned files) |
-| `qa-engineer` | Independent test runs, edge-case probing, proposes tests | no |
-| `security-engineer` | Threat modeling, security review, fix verification (OWASP, authn/authz, injection, XSS/CSRF/SSRF, secrets, dependencies, data privacy, AI/LLM security) | no (reports) |
-| `critical-reviewer` | Adversarial review of plans and diffs | no |
+### 2. Product discovery
 
-Read-only status: `architect`, `product-manager`, `researcher`, `qa-engineer` and `security-engineer` have no Edit/Write tools, and `critical-reviewer` has them denied. `critical-reviewer`, `qa-engineer` and `security-engineer` also have Bash to run checks, which Claude Code cannot restrict by argument, so they are *instructed* not to modify files or run destructive tests rather than technically prevented. `security-engineer` has no web tools. `researcher` and `product-manager` can fetch web pages, so treat fetched content as untrusted.
+Before implementation, AUTO-BUILDER identifies:
 
-Rules: spawn only what the task needs; parallelise only independent work; never let two agents edit the same file ([details](.claude/skills/auto-builder/references/parallel-work.md)).
+- Target users.
+- Core problems.
+- Functional requirements.
+- Non-functional requirements.
+- User journeys.
+- Scope boundaries.
+- Acceptance criteria.
+- Assumptions and risks.
 
-### Supported project types
+Its product interrogation workflow helps uncover missing requirements before they become expensive implementation mistakes.
 
-AI/ML apps · AI agents and multi-agent systems · full-stack · frontend · backend/APIs · developer tools · research projects · automation · data engineering. See the [category guide](.claude/skills/auto-builder/references/project-categories.md).
+### 3. Architecture and research
 
-## Install
+The system researches relevant technologies, evaluates implementation options and develops an architecture.
 
-Requires [Claude Code](https://code.claude.com). The installer copies files only: it **never** overwrites existing files (use `--update` to opt in, with `.bak` backups) and never touches settings, permissions, hooks or `CLAUDE.md`.
+For important decisions, the architecture arena can compare competing approaches and document trade-offs before implementation begins.
+
+### 4. Specialist agent execution
+
+AUTO-BUILDER delegates bounded responsibilities to specialist subagents.
+
+Tasks are organized around dependencies, ownership and integration requirements. Parallel execution is used when work is genuinely independent.
+
+### 5. Milestone-based implementation
+
+Instead of treating an entire project as one large coding task, AUTO-BUILDER divides implementation into verifiable milestones.
+
+Each milestone has:
+- Defined tasks.
+- Owners.
+- Dependencies.
+- Acceptance criteria.
+- Verification commands.
+- A completion gate.
+
+### 6. Independent verification
+
+The implementation is not considered complete simply because the build succeeds.
+
+The quality protocol includes:
+- Relevant test execution.
+- Regression checks.
+- User-journey and API verification.
+- Independent review.
+- Evidence recording.
+- Bounded failure recovery.
+
+### 7. Security review
+
+Projects involving authentication, user data, payments, external APIs, file uploads, secrets, integrations or AI tools receive a dedicated security review.
+
+Security findings are classified by severity, with explicit rules for blocking, fixing and accepting residual risks.
+
+### 8. Delivery and recovery
+
+AUTO-BUILDER maintains project state and records decisions, progress, test results and unresolved issues.
+
+If a session is interrupted, its recovery workflow compares recorded progress against the actual repository state before continuing.
+
+---
+
+## Meet the nine specialist agents
+
+Each agent has a defined responsibility. AUTO-BUILDER selects only the agents needed for the current task.
+
+| Agent | Responsibility |
+|---|---|
+| `product-manager` | Product discovery, user journeys, requirements and acceptance criteria |
+| `researcher` | Research, technical alternatives, libraries and APIs |
+| `architect` | System architecture, schemas, dependencies and technical decisions |
+| `frontend-engineer` | UI implementation, responsive behaviour and accessibility |
+| `backend-engineer` | APIs, databases, integrations and backend systems |
+| `ai-engineer` | LLMs, RAG, agents, evaluations and ML pipelines |
+| `qa-engineer` | Independent testing, edge cases and verification |
+| `security-engineer` | Threat modelling, security reviews and fix verification |
+| `critical-reviewer` | Adversarial review of plans, implementation and decisions |
+
+The lead Claude Code session owns integration and final delivery.
+
+The system does not need to invoke all nine agents for every request.
+
+---
+
+## What makes AUTO-BUILDER different?
+
+AUTO-BUILDER combines several engineering practices into one reusable workflow.
+
+### Product intelligence
+Understands what should be built before deciding how to build it.
+
+### Engineering intelligence
+Evaluates architecture, dependencies, trade-offs and implementation strategies.
+
+### Coordinated execution
+Delegates work to specialists with explicit ownership and integration responsibilities.
+
+### Evidence-driven verification
+Tracks whether requirements and acceptance criteria have actually been verified.
+
+### Security-aware development
+Makes security review part of the engineering lifecycle instead of leaving it until deployment.
+
+### Persistent project context
+Records decisions, tasks, progress, tests and lessons so long-running projects can resume.
+
+### Bounded autonomy
+Allows routine engineering work to proceed while retaining human approval for consequential actions.
+
+---
+
+## AUTO-BUILDER vs gstack vs pstack
+
+There are several interesting projects improving AI-assisted software engineering. AUTO-BUILDER takes a different architectural approach.
+
+| Capability | AUTO-BUILDER | gstack | pstack |
+|---|---|---|---|
+| Primary approach | Orchestrated engineering lifecycle | Specialized engineering workflows | Workflow and orchestration stack |
+| Intelligent task routing | 12-category router | Specialized command workflows | Routing concepts |
+| Product discovery | Integrated interrogation | Office Hours | Workflow-dependent |
+| Architecture | Architecture arena | Engineering review | Architecture arena |
+| Specialist agents | Nine dedicated subagents | Specialized workflows | Swarm-oriented workflows |
+| Milestone-based execution | Core workflow | Workflow-dependent | Workflow-dependent |
+| QA and verification | Integrated quality protocol | Browser and review workflows | Review workflows |
+| Security | Dedicated security agent and gate | Dedicated security workflow | Depends on configuration |
+| Persistent project state | Structured project files | Session workflows | Session pickup concepts |
+| Learning and recovery | Reflect, Correct and recovery | Learning workflows | Reflection and correction concepts |
+| Delivery automation | Approval-controlled playbook | Specialized shipping workflows | Workflow-dependent |
+
+### Where AUTO-BUILDER focuses
+
+**A complete engineering lifecycle.**
+
+Rather than requiring developers to manually coordinate separate workflows, AUTO-BUILDER aims to connect discovery, planning, implementation, verification, security and delivery into one adaptive system.
+
+### What gstack brings
+
+gstack provides specialized workflows for product thinking, engineering reviews, browser QA, security reviews and shipping. Its browser and release tooling are important capabilities that AUTO-BUILDER should continue learning from.
+
+### What pstack brings
+
+pstack explores workflow routing, orchestration, parallel execution, engineering principles, reflection and session recovery. These ideas have influenced the design direction of AUTO-BUILDER.
+
+**These projects solve overlapping but different problems.** AUTO-BUILDER is not claimed to be universally superior. Its differentiation is the unified lifecycle and explicit verification model.
+
+For further details, see the [research and design documents](design/).
+
+---
+
+## What benefits do developers actually get?
+
+The intended value is not simply more generated code. It is less manual coordination and a more disciplined route from requirements to working software.
+
+| Developer challenge | Expected benefit |
+|---|---|
+| Unclear requirements | Earlier discovery of missing information |
+| Repetitive project planning | Structured milestones and task ownership |
+| Large implementation tasks | Specialist delegation and dependency-aware execution |
+| Missed edge cases | Dedicated QA and review workflows |
+| Security overlooked during development | Risk-based security reviews |
+| Context lost between sessions | Persistent state and recovery |
+| Unverified completion claims | Evidence-based delivery reports |
+| Repeated agent mistakes | Reflection and correction mechanisms |
+
+### Who benefits?
+
+- **Solo developers:** Get a more structured engineering process without manually coordinating every activity.
+- **Indie hackers:** Move from an idea to a working MVP with requirements, architecture and verification.
+- **Full-stack developers:** Coordinate frontend, backend and AI implementation more systematically.
+- **AI engineers:** Structure RAG, LLM and agent projects with dedicated research, implementation and evaluation workflows.
+- **Small development teams:** Improve task ownership, review discipline and project traceability.
+
+### Does AUTO-BUILDER increase software quality?
+
+It is designed to improve quality through better requirement coverage, milestone verification, independent reviews, security checks and regression prevention.
+
+However, the amount of improvement depends on the project, model, task, test quality and available tools.
+
+**We do not currently claim a specific percentage increase in code quality, development speed or defect reduction.** Those claims require controlled benchmark results.
+
+See [Verification and limitations](#verification-and-limitations).
+
+---
+
+## Supported project types
+
+AUTO-BUILDER is designed to work across a broad range of engineering projects:
+
+- AI and machine learning applications.
+- LLM and multi-agent systems.
+- RAG applications.
+- Full-stack web applications.
+- Frontend applications.
+- Backend services and APIs.
+- Developer tools.
+- Research projects.
+- Automation systems.
+- Data engineering pipelines.
+
+The task router selects a workflow based on the actual request and its complexity.
+
+---
+
+## Quick Start
+
+### Requirements
+
+- [Claude Code](https://code.claude.com/)
+- Git
+- Bash for the Unix-like installer.
+- Python 3 for the optional helper.
+
+### Installation
 
 **Linux / macOS / WSL / Git Bash**
 
 ```bash
-git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills
+git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills.git
+
 cd ClaudeCODE-Autonomous-skills
-./install.sh --personal                 # all your projects: ~/.claude/
-./install.sh --project /path/to/repo    # one project: <repo>/.claude/
-./install.sh --project --dry-run        # preview into the current directory
+
+# Install for all your projects
+./install.sh --personal
 ```
 
-**Windows (PowerShell)**
+Or install for a single project:
+
+```bash
+./install.sh --project /path/to/your/project
+```
+
+**Windows PowerShell**
 
 ```powershell
-git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills
+git clone https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills.git
+
 cd ClaudeCODE-Autonomous-skills
-.\install.ps1 -Personal                 # %USERPROFILE%\.claude\
-.\install.ps1 -Project -Path C:\path\to\repo
-.\install.ps1 -Project -DryRun
+
+# Install for all your projects
+.\install.ps1 -Personal
 ```
 
-If scripts are blocked: `powershell -ExecutionPolicy Bypass -File .\install.ps1 -Personal`.
+Or install for a specific project:
 
-**Manual:** copy `.claude/skills/auto-builder/` and `.claude/agents/*.md` into `~/.claude/` (personal) or your project's `.claude/`.
+```powershell
+.\install.ps1 -Project -Path C:\path\to\your\project
+```
 
-Opening Claude Code *inside this repository* also works with no install — the skill is already in its `.claude/`.
+For dry-run options, updates and manual installation, see the [installation guide](https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/).
 
-## Use
+### Your first project
+
+Open Claude Code and provide a high-level goal:
 
 ```text
-/auto-builder Build an AI research workspace where users can upload papers, ask grounded questions, and explore citations. Don't deploy anything.
+/auto-builder Build a SaaS task management platform with:
+
+- User authentication
+- Team workspaces
+- Project and task management
+- Role-based permissions
+- Real-time notifications
+- Dashboard and analytics
+
+Research the best architecture, create a milestone plan,
+implement the application and verify the core user journeys.
+
+Do not deploy without my approval.
 ```
 
-Run `/auto-builder` with no argument and it will inspect the repo and ask for one goal. More examples: [examples/goal-prompt.md](.claude/skills/auto-builder/examples/goal-prompt.md).
-
-### Example session (illustrative)
+Or simply run:
 
 ```text
-> /auto-builder Add a rate-limited /v1/orders API with pagination and tests
-
-[Phase 0] Python/FastAPI, pytest, ruff, Postgres via docker-compose. git clean on main.
-          Created branch auto-builder/orders-api.
-[Phase 1-2] Consumers: internal dashboard. Assumed cursor pagination (documented in DECISIONS.md).
-          Acceptance: AC1 list paginates; AC2 429 after limit; AC3 invalid cursor -> 422; AC4 authz enforced.
-[Phase 3-4] architect agent critique: store limiter state in Redis rather than in-process -> accepted.
-          TASKS.md: 5 tasks. Checkpoint A: new Redis dependency (local only). Proceed? 
-> yes
-[Phase 5] backend-engineer: endpoints + limiter. Checkpoint commit "orders: list endpoint".
-[Phase 6] pytest: 2 failed -> fixed -> 31 passed. ruff, mypy clean. critical-reviewer: 1 major
-          (cursor not bound to user) -> fixed, re-verified. qa-engineer: AC1-AC4 verified.
-[Phase 8] Delivered. Not run: load test, deployment. Branch not pushed.
+/auto-builder
 ```
 
-This is a mock-up of the intended flow, not captured output or a benchmark.
+The skill will inspect the repository and ask for a goal if one is needed.
 
-## Configuration
+More examples: [Goal prompt examples](.claude/skills/auto-builder/examples/goal-prompt.md).
 
-| What | How |
-|---|---|
-| Allow Claude to load the skill automatically | In `SKILL.md` frontmatter remove `disable-model-invocation: true` (default is explicit `/auto-builder` only; note that scheduled/`/loop` re-entry then won't trigger it either) |
-| Skip the git work branch | Say "no branch" in the goal (the skill only creates one if you haven't declined). Checkpoint commits are local, made only by the lead; review them with `git log`. With a dirty working tree it is instructed never to commit your uncommitted changes and to ask if it must edit a file you've modified |
-| Require approval of the plan | Say "stop at the plan checkpoint" in the goal |
-| Retry/iteration limits | Defaults are 3 attempts per failing check and 5 implement→verify passes per milestone; the budget lives in the Status block of `docs/auto-builder/TASKS.md` |
-| Change agent models/limits | Edit `model`, `maxTurns`, `tools` in `.claude/agents/<name>.md` ([fields](https://code.claude.com/docs/en/sub-agents)) |
-| Remove an agent | Delete its file; the lead performs that role itself |
-| Project facts | Keep short build/test commands and conventions in your project's `CLAUDE.md` |
+---
 
-### Optional helper script (Python 3, read-only)
+## Quality and engineering principles
 
-`.claude/skills/auto-builder/scripts/ab.py` is an optional, standard-library-only helper the lead can run as `python3 -I ab.py <command>`: `graph` (task-table validation, waves, ownership conflicts and a post-wave check that only owned files changed), `state` (compares what `TASKS.md` claims with git: verified commits, stale evidence, dirty files by owner, retry counters), and `browser-report` (format check for browser QA evidence). It writes nothing, uses no network, runs allow-listed git with repository configuration neutralised, is shipped non-executable, and is covered by hostile-input tests. It may trigger an ordinary permission prompt, and it is not wired into any hook. It checks files and formats; **it proves no behaviour**, and its output must not be cited as verification.
+AUTO-BUILDER follows an evidence-driven development protocol.
 
-### Hooks (optional, off by default)
+### Milestone verification
 
-Two deterministic helpers ship in `scripts/hooks/` but are **not** installed into your settings. To enable, add to `.claude/settings.json` (project) or `~/.claude/settings.json` (personal; replace the path with `"$HOME"/.claude/skills/...`). Requires `jq`; scripts are bash (Git Bash/WSL on Windows). Limits: `protect-secrets.sh` checks file paths of Edit/Write/NotebookEdit only (not Bash commands or Read; use `permissions.deny` for those). `verify-on-stop.sh` retries up to `AUTO_BUILDER_MAX_RETRIES` (default 5) times, has a timeout, then lets Claude stop, so it is a strong nudge rather than an absolute gate. `AUTO_BUILDER_CHECK_CMD` runs as shell: set it only in your own settings, never accept it from an untrusted repository. A zip download may lose the executable bit (`chmod +x`).
+Every meaningful milestone has a verification gate. Tests, regressions, review findings and acceptance criteria are recorded before proceeding.
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      { "matcher": "Edit|Write|NotebookEdit",
-        "hooks": [{ "type": "command",
-          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/skills/auto-builder/scripts/hooks/protect-secrets.sh" }] }
-    ],
-    "Stop": [
-      { "hooks": [{ "type": "command",
-          "command": "AUTO_BUILDER_CHECK_CMD='npm test' \"$CLAUDE_PROJECT_DIR\"/.claude/skills/auto-builder/scripts/hooks/verify-on-stop.sh" }] }
-    ]
-  }
-}
-```
+### Independent review
 
-## Human approval and safety
+The agent responsible for implementation does not automatically serve as the independent reviewer.
 
-Default mode: **full autonomy with critical checkpoints.** No questions about ordinary implementation, refactoring, debugging, tests, docs or in-scope architecture. It asks *before*: destructive database operations, production deployment, spending money/enabling paid services, exposing secrets, deleting important data, irreversible external actions (including pushing or opening PRs), and major changes of product direction.
+If independent reviewers are unavailable, AUTO-BUILDER must disclose that independent review did not take place.
 
-It also: works on a fresh git branch, never pushes or opens PRs on its own, never asks to bypass Claude Code permissions or sandboxing, requires an independent review (and says so in the report if the reviewer agents are missing), and is told to report unrun checks honestly. These are instructions to the model, not hard guarantees — use Claude Code's [permissions and sandboxing](https://code.claude.com/docs/en/settings) as the enforcement layer, and review the diff yourself. Foreground subagent permission prompts reach you, so a hands-off run needs your commonly used test/lint/build commands pre-allowed; prefer narrow allow rules over bypass modes.
+### Bounded recovery
 
-## Repository layout
+Failures are investigated using root-cause analysis and limited correction attempts. The system must report blockers rather than retry indefinitely.
+
+### Persistent state
+
+Project documentation is stored under:
 
 ```text
-.
-├── .claude/
-│   ├── agents/
-│   │   ├── ai-engineer.md
-│   │   ├── architect.md
-│   │   ├── backend-engineer.md
-│   │   ├── critical-reviewer.md
-│   │   ├── frontend-engineer.md
-│   │   ├── product-manager.md
-│   │   ├── qa-engineer.md
-│   │   ├── researcher.md
-│   │   └── security-engineer.md
-│   └── skills/
-│       └── auto-builder/
-│           ├── examples/
-│           │   └── goal-prompt.md
-│           ├── playbooks/
-│           │   ├── bug-fix.md
-│           │   ├── feature.md
-│           │   ├── inquiry.md
-│           │   ├── performance.md
-│           │   ├── refactor.md
-│           │   ├── release.md
-│           │   ├── security-assessment.md
-│           │   └── test-and-docs.md
-│           ├── principles/
-│           │   ├── engineering-principles.md
-│           │   └── influences-and-sources.md
-│           ├── references/
-│           │   ├── claude-code-features.md
-│           │   ├── parallel-work.md
-│           │   └── project-categories.md
-│           ├── scripts/
-│           │   ├── hooks/
-│           │   │   ├── protect-secrets.sh
-│           │   │   └── verify-on-stop.sh
-│           │   ├── ab.py
-│           │   └── init-artifacts.sh
-│           ├── templates/
-│           │   ├── ARCHITECTURE.md
-│           │   ├── BROWSER-QA.md
-│           │   ├── DECISIONS.md
-│           │   ├── LESSONS.md
-│           │   ├── PROGRESS.md
-│           │   ├── PROJECT.md
-│           │   ├── REQUIREMENTS.md
-│           │   ├── SECURITY-REVIEW.md
-│           │   ├── TASKS.md
-│           │   └── TESTING.md
-│           ├── workflows/
-│           │   ├── arena.md
-│           │   ├── browser-qa.md
-│           │   ├── delivery.md
-│           │   ├── discovery.md
-│           │   ├── implementation.md
-│           │   ├── independent-review.md
-│           │   ├── planning.md
-│           │   ├── router.md
-│           │   ├── security.md
-│           │   ├── session-recovery.md
-│           │   ├── swarm.md
-│           │   ├── tdd.md
-│           │   └── verification.md
-│           └── SKILL.md
-├── .github/
-│   ├── ISSUE_TEMPLATE/
-│   │   ├── bug_report.yml
-│   │   ├── config.yml
-│   │   └── feature_request.yml
-│   ├── workflows/
-│   │   └── validate.yml
-│   └── PULL_REQUEST_TEMPLATE.md
-├── design/
-│   ├── architecture/
-│   │   ├── AUTOBUILDER-2.0-DESIGN.md
-│   │   ├── DESIGN-REVIEW-LOG.md
-│   │   ├── IMPLEMENTATION-REVIEW-LOG.md
-│   │   ├── IMPLEMENTATION-STATUS.md
-│   │   ├── LEARNING-ENGINE.md
-│   │   ├── ORCHESTRATION.md
-│   │   └── VERIFICATION-ENGINE.md
-│   ├── benchmarks/
-│   │   └── BENCHMARK-PLAN.md
-│   ├── research/
-│   │   ├── AUTOBUILDER-GAP-ANALYSIS.md
-│   │   ├── GSTACK-RESEARCH.md
-│   │   └── PSTACK-RESEARCH.md
-│   ├── roadmap/
-│   │   └── IMPROVEMENT-ROADMAP.md
-│   └── README.md
-├── docs/
-│   ├── assets/
-│   │   ├── favicon.svg
-│   │   ├── og-image.png
-│   │   ├── site.js
-│   │   └── style.css
-│   ├── .nojekyll
-│   ├── 404.html
-│   ├── architecture.html
-│   ├── faq.html
-│   ├── features.html
-│   ├── index.html
-│   ├── installation.html
-│   ├── robots.txt
-│   ├── sitemap.xml
-│   └── usage.html
-├── launch/
-│   ├── README.md
-│   ├── announcement.md
-│   ├── community-posts.md
-│   ├── devto-tutorial.md
-│   ├── github-metadata.md
-│   ├── launch-checklist.md
-│   ├── merge-and-publication-checklist.md
-│   ├── release-notes-v1.0.0.md
-│   ├── search-console.md
-│   ├── seo-strategy.md
-│   └── social-preview-spec.md
-├── site/
-│   ├── pages/
-│   │   ├── 404.html
-│   │   ├── architecture.html
-│   │   ├── faq.html
-│   │   ├── features.html
-│   │   ├── index.html
-│   │   ├── installation.html
-│   │   └── usage.html
-│   ├── build.py
-│   ├── check.py
-│   └── og-image.html
-├── tests/
-│   ├── fixtures/
-│   │   └── routing-eval.json
-│   ├── run-all.sh
-│   ├── test-install.sh
-│   ├── test_ab.py
-│   ├── test_mutations.py
-│   └── validate.py
-├── .gitignore
-├── CHANGELOG.md
-├── CLAUDE.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-├── SECURITY.md
-├── install.ps1
-└── install.sh
+docs/auto-builder/
+├── PROJECT.md
+├── REQUIREMENTS.md
+├── ARCHITECTURE.md
+├── TASKS.md
+├── TESTING.md
+├── DECISIONS.md
+├── PROGRESS.md
+├── SECURITY-REVIEW.md
+├── BROWSER-QA.md
+└── LESSONS.md
 ```
 
-## Troubleshooting
+Only the files appropriate to the project's size and needs are created.
 
-| Symptom | Fix |
-|---|---|
-| `/auto-builder` not listed | Confirm `<project or ~>/.claude/skills/auto-builder/SKILL.md` exists; restart the Claude Code session |
-| Agents not used | Confirm files in `.claude/agents/`; a pre-existing agent with the same name wins and the installer reports `PRESERVE` |
-| Installer says `STALE` / `CONFLICT` | `STALE`: file from an older version, safe to delete by hand. `CONFLICT`: a symlink or directory sits where a file belongs; resolve manually |
-| Installer says `PRESERVE` | Your file differs from the package; keep it, or run with `--update` / `-Update` (backup saved as `.bak`) |
-| `Permission denied` on scripts | `chmod +x .claude/skills/auto-builder/scripts/*.sh .claude/skills/auto-builder/scripts/hooks/*.sh install.sh` |
-| Hooks do nothing | Install `jq`; check the command path and the JSON in settings |
-| PowerShell blocks `install.ps1` | See execution-policy note above |
-| Claude pauses a lot | Normal for checkpoints; tell it which category of decision to default on, or tighten permission rules |
+### Honest delivery
 
-## Verification status
+Every acceptance criterion is classified as:
 
-A live, end-to-end `/auto-builder` run has **not** been performed, so there are no measurements of routing accuracy or of improved outcomes, and the old-versus-new [benchmark](design/benchmarks/BENCHMARK-PLAN.md) is designed but **not run**. Partial evidence: Claude Code's agent registry listed the project agents once they existed in `.claude/agents/`.
+- Verified.
+- Partially verified.
+- Untested.
 
-The checks (`python3 -I tests/validate.py`, `bash tests/test-install.sh`) pass on Linux locally; the GitHub Actions workflow passed on GitHub for PR #1 and on `main` (Linux runner; static validation and installer tests only, not a live Claude Code run). **Not verified:** a live `/auto-builder` run inside Claude Code, and `install.ps1` on Windows. Please report issues.
+The final report identifies the actual checks performed, unresolved findings, limitations and next steps.
+
+---
+
+## Safety and human control
+
+AUTO-BUILDER is designed for bounded autonomy, not unrestricted execution.
+
+It can proceed with ordinary development decisions, local implementation and testing within the agreed scope.
+
+It must ask for approval before consequential actions, including:
+
+- Production deployments.
+- Spending money or enabling paid services.
+- Destructive database operations or deleting important data.
+- Exposing or creating secrets and credentials.
+- Irreversible external actions.
+- Pushing, opening PRs, merging or releasing unless explicitly requested.
+- Accepting a High security finding as residual risk.
+
+Repository files, issue descriptions, PR text and web pages are treated as untrusted data. They cannot grant approvals or override safety limits.
+
+**Important:** Some controls are enforced by scripts or tool permissions; others are instructions to the model. AUTO-BUILDER is not a security sandbox, and its workflow does not guarantee defect-free or secure software.
+
+---
+
+## Verification and limitations
+
+AUTO-BUILDER is an early-release project. Its local validators, installer tests and helper tests verify implementation mechanisms, not the full behaviour of a live AI agent.
+
+Some capabilities depend on Claude Code, installed subagents, browser availability, model behaviour and the permissions granted by the user.
+
+Known limitations include:
+
+- Live model behaviour and routing accuracy require real-session evaluation.
+- Browser QA depends on an available browser setup; report-format validation is not browser automation.
+- Parallel workers can share a working tree unless isolated worktrees are used.
+- Some safety boundaries are instruction-based rather than technically enforced.
+- Windows installation and platform-specific behaviour must be tested on the relevant operating systems.
+- A successful test suite does not prove that every requirement has been met.
+
+We prefer explicit limitations over unsupported claims.
+
+---
+
+## Roadmap
+
+Our focus is to make AUTO-BUILDER more reliable, measurable and useful in real development.
+
+Planned improvement areas include:
+
+- Live router evaluation and calibration.
+- Stronger deterministic permission enforcement.
+- Isolated worktree execution for parallel agents.
+- Reproducible browser QA integration.
+- Stronger regression and evidence validation.
+- More reliable session recovery.
+- Controlled benchmark comparisons.
+- Improved cross-platform verification.
+
+We prioritize proven engineering improvements over simply increasing the number of agents or features.
+
+---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Report bugs and ideas through the [issue templates](https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/issues/new/choose); report security problems per [SECURITY.md](SECURITY.md). Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+Contributions are welcome.
+
+Useful areas include:
+
+- Better engineering playbooks.
+- Improved task-routing cases.
+- Reproducible tests and evaluation scenarios.
+- Security improvements.
+- Browser QA integrations.
+- Documentation and installation improvements.
+- Cross-platform compatibility.
+
+Please open an issue to discuss significant changes before submitting a large pull request.
+
+All contributions should preserve the project's security boundaries, approval rules and evidence-based verification principles.
+
+---
+
+## Project links
+
+- **GitHub:** https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills
+- **Website:** https://bsrikumar855-dot.github.io/ClaudeCODE-Autonomous-skills/
+- **Issues:** https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/issues
+- **Discussions:** https://github.com/bsrikumar855-dot/ClaudeCODE-Autonomous-skills/discussions
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+Licensed under the [Apache License 2.0](LICENSE).
+
+AUTO-BUILDER is an independent community project and is not affiliated with or endorsed by Anthropic.
+
+---
+
+<p align="center">
+  <strong>Build with intention. Verify with evidence. Ship with confidence.</strong>
+</p>
+
+<p align="center">
+  Made for developers who want AI to do more than write code.
+</p>
