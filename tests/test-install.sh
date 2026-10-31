@@ -23,6 +23,9 @@ t "repo ships exactly nine agents"        test "$n_agents" -eq 9
 t "personal: all nine agents installed"  test "$(ls "$home/.claude/agents" | wc -l)" -eq "$n_agents"
 t "personal: security-engineer installed" test -f "$home/.claude/agents/security-engineer.md"
 t "personal: hook script stays executable" test -x "$home/.claude/skills/auto-builder/scripts/hooks/protect-secrets.sh"
+t "personal: all playbooks installed"     test "$(ls "$home/.claude/skills/auto-builder/playbooks" | wc -l)" -eq "$(ls "$repo/.claude/skills/auto-builder/playbooks" | wc -l)"
+t "personal: router + arena installed"   test -f "$home/.claude/skills/auto-builder/workflows/router.md" -a -f "$home/.claude/skills/auto-builder/workflows/arena.md"
+t "personal: principles installed"       test -f "$home/.claude/skills/auto-builder/principles/engineering-principles.md"
 t "personal: templates installed"        test -f "$home/.claude/skills/auto-builder/templates/TASKS.md"
 t "personal: no settings/CLAUDE.md written" bash -c "! ls '$home/.claude/settings.json' '$home/.claude/CLAUDE.md' 2>/dev/null"
 

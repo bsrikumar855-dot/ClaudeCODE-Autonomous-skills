@@ -14,8 +14,10 @@
 
 ## Milestone gates
 
-| Milestone | Expected outcome | Verification command(s) | Tests run | Regression run | Review (independent?) | Criteria verified | Docs updated | Open blocker/major | Gate passed |
-|---|---|---|---|---|---|---|---|---|---|
+| Milestone | Expected outcome | Verification command(s) | Tests run | Regression run | Review (fresh-context? independent?) | Criteria verified | Docs updated | Open blocker/major | Gate passed | Verified at (sha) |
+|---|---|---|---|---|---|---|---|---|---|---|
+
+`Verified at` is the commit created by the lead's gate-passing checkpoint commit for that milestone (empty until then). Only the lead sets it.
 
 ## Acceptance checklist
 
@@ -24,8 +26,10 @@
 
 ## Tasks
 
-| ID | Task | Milestone | Dependencies | Acceptance criteria | Verification | Status | Owner | Files owned |
-|---|---|---|---|---|---|---|---|---|
+Strict grammar (tools parse this table and fail loudly on anything else): `Dependencies` = comma-separated task IDs or `-`; `Files owned` = comma-separated repo-relative paths, directories or globs (no `..`, no absolute paths, no match-everything globs); `Flags` = comma-separated from `high-risk`, `human-decision`, `shared-file`, or empty (a missing `Flags` column means none).
+
+| ID | Task | Milestone | Dependencies | Acceptance criteria | Verification | Status | Owner | Files owned | Flags |
+|---|---|---|---|---|---|---|---|---|---|
 
 ## Blockers
 

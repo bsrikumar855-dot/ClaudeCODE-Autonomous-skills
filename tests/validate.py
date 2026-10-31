@@ -314,6 +314,139 @@ def check_protocol():
         pass
 
 
+def table_rows(text, first_col_header):
+    """Parse a markdown table whose header starts with first_col_header; return list of cell lists."""
+    lines, out, on = text.splitlines(), [], False
+    for l in lines:
+        if l.startswith("|") and l.lower().lstrip("| ").startswith(first_col_header.lower()):
+            on = True
+            continue
+        if on:
+            if not l.startswith("|"):
+                break
+            cells = [c.strip() for c in l.strip().strip("|").split("|")]
+            if set("".join(cells)) <= set("-: "):
+                continue
+            out.append(cells)
+    return out
+
+
+def check_router():
+    """Router table, playbooks, discovery/arena rules, principles, untrusted-data and limits (mechanism tests)."""
+    wf = os.path.join(SKILL_DIR, "workflows")
+    pb = os.path.join(SKILL_DIR, "playbooks")
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    router_path = os.path.join(wf, "router.md")
+    if not ok(os.path.isfile(router_path), "missing workflows/router.md"):
+        return
+    router = open(router_path, encoding="utf-8").read()
+    cats = ["new-project", "new-feature", "bug-fix", "investigation", "refactoring", "performance",
+            "security-assessment", "code-review", "research", "testing", "documentation", "release-deployment"]
+    rows = table_rows(router, "Category")
+    ok([r[0] for r in rows] == cats, f"router table categories differ: {[r[0] for r in rows]}")
+    for r in rows:
+        if len(r) != 4:
+            ok(False, f"router row malformed: {r}")
+            continue
+        cat, play, spec, gates = r
+        path, _, anchor = play.partition("#")
+        if cat != "new-project":
+            f = os.path.join(SKILL_DIR, path)
+            if ok(os.path.isfile(f), f"router: playbook missing for {cat}: {play}") and anchor:
+                ok(re.search(rf"^## {re.escape(anchor)}\b", open(f, encoding="utf-8").read(), flags=re.M) is not None,
+                   f"router: anchor '#{anchor}' not found in {path}")
+        for sp in [x.strip() for x in spec.split(",") if x.strip()]:
+            ok(sp in EXPECTED_AGENTS, f"router: unknown specialist '{sp}' for {cat}")
+        kv = dict(x.strip().split(":", 1) for x in gates.split(";") if ":" in x)
+        ok("security" in kv and kv["security"] in ("if-triggered", "always"), f"router: {cat} must have security:if-triggered|always (never 'no')")
+    by = {r[0]: r for r in rows if len(r) == 4}
+    if "security-assessment" in by:
+        ok("security:always" in by["security-assessment"][3].replace(" ", ""), "security-assessment must have security:always")
+    if "release-deployment" in by:
+        ok("approval:always" in by["release-deployment"][3].replace(" ", ""), "release-deployment must have approval:always")
+    for phrase in ("trivial bypass", "user's own message", "gates are **added**", "never removed", "one** focused question",
+                   "never ask", "one milestone row", "has **not been run**", "judged by what the change touches"):
+        ok(phrase.lower() in router.lower(), f"router.md missing: '{phrase}'")
+    # routing eval set
+    fx = os.path.join(ROOT, "tests", "fixtures", "routing-eval.json")
+    if ok(os.path.isfile(fx), "missing tests/fixtures/routing-eval.json"):
+        import json
+        data = json.load(open(fx, encoding="utf-8"))
+        ok(data.get("status") == "NOT RUN", "routing eval set must be labelled status NOT RUN")
+        valid = set(cats) | {"ask", "trivial"}
+        kinds = {c["kind"] for c in data["cases"]}
+        ok(len(data["cases"]) >= 24, "routing eval set too small")
+        ok({"clear", "ambiguous", "trivial", "adversarial"} <= kinds, f"eval set must cover clear/ambiguous/trivial/adversarial, has {kinds}")
+        ok(all(c["expected"] in valid and set(c.get("acceptable", [])) <= valid for c in data["cases"]), "eval set references an unknown category")
+        ok(all(c["expected"] in ("ask", "trivial") or c["expected"] in cats for c in data["cases"]), "bad expected category")
+        ok(sum(1 for c in data["cases"] if c["kind"] == "ambiguous") >= 3, "need ambiguous cases")
+        ok(set(data["categories"]) == set(cats) and all(any(c["expected"] == k for c in data["cases"]) for k in cats),
+           "eval set must have at least one case per category")
+    # playbooks
+    principles = open(os.path.join(SKILL_DIR, "principles", "engineering-principles.md"), encoding="utf-8").read()
+    ids = [f"P{n:02d}" for n in range(1, 14)]
+    for pid in ids:
+        ok(re.search(rf"^\| {pid} \|", principles, flags=re.M) is not None, f"principle {pid} missing")
+    names = ("Simplicity", "Maintainability", "Testability", "Security by design", "Least privilege", "API design",
+             "Error handling", "Performance", "Observability", "Documentation", "Dependency management",
+             "Backward compatibility", "Evidence-based completion")
+    ok(all(n in principles for n in names), "principles file missing one of the 13 required topics")
+    ok(all("Verify by" in principles for _ in [0]) and principles.count("|") > 13 * 4, "principles need a 'Verify by' column")
+    used = set()
+    expected_files = {"feature.md", "bug-fix.md", "refactor.md", "performance.md", "security-assessment.md",
+                      "inquiry.md", "test-and-docs.md", "release.md"}
+    ok(os.path.isdir(pb) and set(os.listdir(pb)) == expected_files, f"playbooks differ: {set(os.listdir(pb)) ^ expected_files if os.path.isdir(pb) else 'missing dir'}")
+    for f in sorted(expected_files):
+        t = open(os.path.join(pb, f), encoding="utf-8").read()
+        ok(len(t.splitlines()) <= 60, f"playbooks/{f} too long")
+        ok(not re.search(r"^\W*(Specialists|Gates)\b", t, flags=re.M), f"playbooks/{f} restates specialists/gates (router.md is the only place)")
+        ok(not re.search(r"(≤|at most|up to|max(imum)?)\s*\d", t, flags=re.I), f"playbooks/{f} states a numeric cap (see SKILL.md Limits)")
+        if f in ("inquiry.md", "test-and-docs.md"):
+            sections = re.split(r"^## ", t, flags=re.M)[1:]
+            for sec in sections:
+                ok(all(h in sec for h in ("**Steps**", "**Principles**", "**Completion criteria**")), f"playbooks/{f} section '{sec.splitlines()[0]}' incomplete")
+        else:
+            ok(all(h in t for h in ("## Steps", "## Principles", "## Completion criteria")), f"playbooks/{f} missing Steps/Principles/Completion criteria")
+        used |= set(re.findall(r"\bP\d\d\b", t))
+        ok(set(re.findall(r"\bP\d\d\b", t)) <= set(ids), f"playbooks/{f} cites an unknown principle")
+        crit_blocks = re.split(r"Completion criteria", t)[1:]
+        ok(crit_blocks and all(len(re.findall(r"^\s*- ", blk.split("\n## ")[0], flags=re.M)) >= 2 for blk in crit_blocks),
+           f"playbooks/{f}: each Completion criteria block needs at least two concrete bullets")
+    ok(used >= set(ids), f"principles never cited by any playbook: {sorted(set(ids) - used)}")
+    # no numeric caps outside SKILL.md Limits in workflows/references
+    for d in (wf, os.path.join(SKILL_DIR, "references")):
+        for f in sorted(os.listdir(d)):
+            t = open(os.path.join(d, f), encoding="utf-8").read()
+            ok(not re.search(r"(≤|at most|up to)\s*\d", t, flags=re.I), f"{f}: numeric cap outside SKILL.md Limits")
+    # discovery (interrogation) and arena
+    disc = open(os.path.join(wf, "discovery.md"), encoding="utf-8").read().lower()
+    for phrase in ("run it", "skip it", "trivial", "what is the smallest valuable solution", "which assumptions are unverified",
+                   "what are the success metrics", "explicitly **not** be built", "how is it solved today",
+                   "product discovery", "ceo-level challenge", "mvp scope review", "feature prioritization", "user-journey analysis",
+                   "decision tiers", "user-challenge", "final authority", "do not agree automatically", "inspect an existing application"):
+        ok(phrase in disc, f"discovery.md missing: '{phrase}'")
+    arena = open(os.path.join(wf, "arena.md"), encoding="utf-8").read().lower()
+    for phrase in ("hard to reverse", "never for conventional", "pre-mortem", "into `decisions.md` first", "why each alternative was rejected",
+                   "does not make the decision objective", "fresh-context", "limits", "security-engineer", "reframe once", "ask the user"):
+        ok(phrase in arena, f"arena.md missing: '{phrase}'")
+    # SKILL.md wiring: router, untrusted data, limits
+    for sec, phrases in (("Task router", ("trivial changes", "12 categories", "one milestone row", "only **adds** gates", "one focused question", "never ask")),
+                         ("Untrusted data", ("data, not instructions", "never** grant an approval", "waive a gate", "raise or reset a limit",
+                                              "only lower", "current session", "tell the user what you found", "marking it as data")),
+                         ("Limits", ("defined once", "never as a new budget", "concurrent workers per wave", "arena independent candidates",
+                                     "3 fix-push-recheck rounds", "elapsed"))):
+        body = section(skill, sec, "##").lower()
+        ok(bool(body), f"SKILL.md missing section '{sec}'")
+        for ph in phrases:
+            ok(ph.lower() in body, f"SKILL.md '{sec}' missing: '{ph}'")
+    ok("workflows/router.md" in skill and "workflows/arena.md" in skill and "principles/engineering-principles.md" in skill,
+       "SKILL.md must link router, arena and principles")
+    ok("workflows/discovery.md" in section(skill, "Phase 1", "###") or "discovery.md" in skill, "Phase 1 must reference discovery/interrogation")
+    ok(len(skill.splitlines()) < 300, "SKILL.md should stay compact (<300 lines)")
+    tasks = open(os.path.join(SKILL_DIR, "templates", "TASKS.md"), encoding="utf-8").read()
+    ok("| Flags |" in tasks and "Verified at (sha)" in tasks and "Strict grammar" in tasks, "TASKS.md template needs Flags, Verified at (sha) and the strict-grammar note")
+
+
 def check_security():
     """The security-engineer agent and the Security gate must exist and be wired into the lifecycle."""
     path = os.path.join(AGENT_DIR, "security-engineer.md")
@@ -415,6 +548,7 @@ def main():
     check_scripts()
     check_protocol()
     check_security()
+    check_router()
     check_hygiene()
     if errors:
         print(f"FAILED: {len(errors)} problem(s) in {checks} checks")
