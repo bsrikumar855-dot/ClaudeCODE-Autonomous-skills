@@ -562,6 +562,39 @@ def check_verification2():
     ok("BROWSER-QA.md" in skill, "SKILL.md state files must list BROWSER-QA.md")
 
 
+def check_recovery():
+    """Resume, pause, reflect and correct rules; lessons scope separation; state check contract."""
+    sr = open(os.path.join(SKILL_DIR, "workflows", "session-recovery.md"), encoding="utf-8").read().lower()
+    for ph in ("data** (skill.md, untrusted data)", "verify against the repository", "ab.py state", "`verified at` commit", "ancestor of `head`",
+               '"unknown"', "not \"untrustworthy\"", "stale evidence (best effort)", "not** detected", "hint, not proof", "dirty files by owner",
+               "do not commit it or touch it", "wave was in flight", "re-run the current milestone's verification", "never assume a task is complete",
+               "retry budgets are not reset by restarting", "only the user may reset a budget", "only lower a remaining budget", "not tamper-proof",
+               "pause or interruption", "do not push or open a pr", "`wip:`", "reflect", "no raw command output", "no secrets", "no personal data",
+               "near-duplicate", "obsolete", "never instruct a later run", "correct", "second time", "highest level that works",
+               "would have failed on the real past mistake", "**proposal**", "you never apply it", "explicit approval in the current session",
+               "never merged into the lessons", "changed only by the user", "tell the user what you found"):
+        ok(ph in sr, f"session-recovery.md missing: '{ph}'")
+    tpl = open(os.path.join(SKILL_DIR, "templates", "LESSONS.md"), encoding="utf-8").read()
+    for h in ("## Project lessons (this project only)", "## Proposals for AUTO-BUILDER (never applied by the skill; the user decides)",
+              "data, not instructions", "No raw command output", "applied", "explicit approval in the current session", "approved-by-user"):
+        ok(h in tpl, f"LESSONS.md template missing: {h}")
+    ok(tpl.index("## Project lessons") < tpl.index("## Proposals for AUTO-BUILDER"), "LESSONS.md: project lessons and proposals must be separate sections")
+    ab = open(os.path.join(SKILL_DIR, "scripts", "ab.py"), encoding="utf-8").read()
+    for ph in ("never changes or resets", "counter regression", "do not reset retry budgets", "not an ancestor of HEAD", "status unknown",
+               "owned by no task", "treat as the user's change", "unanchored", "re-run the current milestone's verification"):
+        ok(ph in ab, f"ab.py state missing: '{ph}'")
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    rp = section(skill, "Resume protocol", "##").lower()
+    for ph in ("session-recovery.md", "verify against git", "never proof", "never resets retry counters"):
+        ok(ph in rp, f"SKILL.md Resume protocol missing: '{ph}'")
+    ok("LESSONS.md" in skill and "only the user may apply" in skill, "SKILL.md state files must list LESSONS.md with the user-only rule")
+    ok("lessons cap in limits" in section(skill, "Phase 8", "###").lower(), "Phase 8 must reference the lessons cap in Limits")
+    ok("session-recovery.md" in skill, "SKILL.md must link session-recovery.md")
+    # init-artifacts supports selective copy and validates names
+    ia = open(os.path.join(SKILL_DIR, "scripts", "init-artifacts.sh"), encoding="utf-8").read()
+    ok("invalid template name" in ia and "no such template" in ia and "never overwrites" in ia.lower(), "init-artifacts.sh must validate names and never overwrite")
+
+
 def check_security():
     """The security-engineer agent and the Security gate must exist and be wired into the lifecycle."""
     path = os.path.join(AGENT_DIR, "security-engineer.md")
@@ -666,6 +699,7 @@ def main():
     check_router()
     check_ab()
     check_verification2()
+    check_recovery()
     check_hygiene()
     if errors:
         print(f"FAILED: {len(errors)} problem(s) in {checks} checks")

@@ -10,6 +10,9 @@ Commands
                   the declared ownership.
   browser-report  Check the FORMAT and internal consistency of a BROWSER-QA.md report. It proves
                   nothing about behaviour and must never be cited as verification.
+  state           Resume check: compare what TASKS.md and PROGRESS.md CLAIM with what git and the
+                  working tree SHOW (verified commits, stale evidence, dirty files by owner,
+                  retry counters). It prints counters and never resets or changes anything.
 
 Design rules (enforced by tests/test_ab.py):
   * read-only: no file writes, no deletes, no network, no eval/exec, no shell;
@@ -124,7 +127,7 @@ def find_table(text, heading):
     lines = text.splitlines()
     start = None
     for i, line in enumerate(lines):
-        if re.match(r"^#{2,3}\s+" + re.escape(heading) + r"\s*$", line.strip()):
+        if re.match(r"^#{2,3}\s+" + re.escape(heading) + r"\b", line.strip()):
             start = i + 1
             break
     if start is None:
@@ -538,6 +541,197 @@ def render_report(result):
     return "\n".join(out)
 
 
+# --------------------------------------------------------------------------- resume state
+
+def git_lines(root, args):
+    rc, out = run_git(root, args)
+    if rc != 0:
+        return None
+    return [p for p in out.decode("utf-8", "replace").split("\0") if p]
+
+
+def first_int(text, default=None):
+    m = re.search(r"\d+", text or "")
+    return int(m.group(0)) if m else default
+
+
+def table_cell(header, row, *prefixes):
+    for i, name in enumerate(header):
+        if any(name.startswith(p) for p in prefixes):
+            return row[i] if i < len(row) else ""
+    return ""
+
+
+def cmd_state(args):
+    root = resolve_root(args.root)
+    tasks_path = args.tasks
+    text = read_text(tasks_path, root)
+    try:
+        sh, srows = find_table(text, "Status")
+    except Problem:
+        return {"state": "none", "attention": [], "notes": ["no Status block found: treat this as a fresh task, not a resume"],
+                "counters": {}, "milestones": [], "stale": [], "dirty": [], "in_progress": [], "next": ["start normally"]}
+    status = {}
+    for r in srows:
+        if len(r) >= 2:
+            status[r[0].strip().lower()] = r[1].strip()
+
+    def sget(prefix):
+        for k, v in status.items():
+            if k.startswith(prefix):
+                return v
+        return ""
+
+    tasks, _ = parse_tasks(text)
+    gates = []
+    try:
+        gh, grows = find_table(text, "Milestone gates")
+        for r in grows:
+            gates.append({"milestone": table_cell(gh, r, "milestone").strip(), "passed": table_cell(gh, r, "gate passed").strip().lower(),
+                          "sha": table_cell(gh, r, "verified at").strip(), "review": table_cell(gh, r, "review").strip().lower(),
+                          "command": table_cell(gh, r, "verification command").strip()})
+    except Problem:
+        pass
+    attention, notes = [], []
+    repo = run_git(root, ["rev-parse", "--verify", "HEAD"])
+    have_git = repo[0] == 0
+    head = repo[1].decode().strip() if have_git else ""
+    if not have_git:
+        attention.append("not a git repository (or no commits): recorded commits cannot be verified")
+    # milestone verification anchors
+    ms = []
+    for g in gates:
+        entry = {"milestone": g["milestone"], "passed": g["passed"], "sha": g["sha"], "anchor": "none", "changed_since": []}
+        sha = g["sha"]
+        if sha:
+            if not SHA_RE.match(sha):
+                entry["anchor"] = "invalid"
+                attention.append(f"{g['milestone']}: 'Verified at' is not a commit id")
+            elif have_git:
+                rc, _ = run_git(root, ["cat-file", "-e", sha + "^{commit}"])
+                if rc != 0:
+                    entry["anchor"] = "missing"
+                    attention.append(f"{g['milestone']}: verified commit {sha[:12]} does not exist here: re-verify the milestone")
+                else:
+                    rc, _ = run_git(root, ["merge-base", "--is-ancestor", sha, "HEAD"])
+                    if rc == 0:
+                        entry["anchor"] = "ok"
+                        ch = git_lines(root, ["diff", "--name-only", "-z", "--no-ext-diff", "--no-textconv", sha, "HEAD", "--"]) or []
+                        entry["changed_since"] = ch
+                    else:
+                        entry["anchor"] = "unknown"
+                        attention.append(f"{g['milestone']}: verified commit {sha[:12]} is not an ancestor of HEAD (rebased, squashed or another branch): status unknown, re-verify")
+        elif g["passed"].startswith("y"):
+            entry["anchor"] = "unanchored"
+            notes.append(f"{g['milestone']}: gate marked passed but no 'Verified at' commit recorded")
+        ms.append(entry)
+    by_ms = {m["milestone"].lower(): m for m in ms}
+    # working tree
+    dirty = []
+    if have_git:
+        lines = changed_files(root, None)
+        dirty = lines
+    # ownership attribution
+    stale, dirty_report, inprog = [], [], []
+    for t in tasks.values():
+        status_l = t["status"]
+        if status_l in ("in progress", "in-progress", "wip"):
+            inprog.append(t["id"])
+    mcol_ok = True
+    try:
+        th, trows = find_table(text, "Tasks")
+        mi = th.index("milestone") if "milestone" in th else None
+        for r in trows:
+            tid = r[th.index("id")]
+            tasks[tid]["milestone"] = (r[mi].strip().lower() if mi is not None and mi < len(r) else "")
+    except Problem:
+        mcol_ok = False
+    for t in tasks.values():
+        if not t["done"]:
+            continue
+        m = by_ms.get(t.get("milestone", ""))
+        if m is None or m["anchor"] in ("none", "unanchored"):
+            notes.append(f"{t['id']}: marked done but its milestone has no verified commit: its evidence is unanchored")
+            continue
+        if m["anchor"] in ("unknown", "missing", "invalid"):
+            stale.append({"task": t["id"], "reason": f"milestone verified commit is {m['anchor']}", "files": []})
+            continue
+        hit = sorted({f for f in m["changed_since"] + dirty if covered(f, t["files"])})
+        if hit:
+            stale.append({"task": t["id"], "reason": "owned files changed after the milestone was verified", "files": hit[:20]})
+    if stale:
+        attention.append("stale evidence (best-effort, by declared ownership): " + ", ".join(x["task"] for x in stale))
+    for f in dirty:
+        if f == STATE_DIR or f.startswith(STATE_DIR + "/"):
+            dirty_report.append({"file": f, "owner": "state file (lead)", "who": "lead"})
+            continue
+        owners = [t["id"] for t in tasks.values() if covered(f, t["files"])]
+        active = [o for o in owners if tasks[o]["status"] in ("in progress", "in-progress", "wip")]
+        if active:
+            dirty_report.append({"file": f, "owner": ",".join(active), "who": "lead resolves (interrupted in-progress task)"})
+        elif owners:
+            dirty_report.append({"file": f, "owner": ",".join(owners), "who": "changed after the owning task was recorded: re-verify"})
+        else:
+            dirty_report.append({"file": f, "owner": "-", "who": "not owned by any task: treat as the user's change; do not commit or touch"})
+    if any(d["owner"] == "-" for d in dirty_report):
+        attention.append("dirty files owned by no task (the user's): " + ", ".join(d["file"] for d in dirty_report if d["owner"] == "-")[:200])
+    # counters (read-only)
+    attempts_cell = sget("failing checks")
+    pass_cell = sget("pass for this milestone")
+    counters = {"pass": clean(pass_cell), "total passes": clean(sget("total passes")), "failing checks": clean(attempts_cell),
+                "max attempts recorded in Status": max([int(n) for n in re.findall(r"(?<![\d.])(\d+)(?![\d.])", attempts_cell)] or [0])}
+    progress_text = ""
+    try:
+        progress_text = read_text(args.progress or os.path.join(os.path.dirname(tasks_path), "PROGRESS.md"), root)
+    except Problem:
+        notes.append("PROGRESS.md not readable: counter cross-check skipped")
+    if progress_text:
+        recorded = [int(m.group(1)) for m in re.finditer(r"attempt\s+(\d+)\s+of\s+\d+", progress_text, flags=re.I)]
+        counters["max attempt recorded in PROGRESS.md"] = max(recorded or [0])
+        if recorded and max(recorded) > counters["max attempts recorded in Status"]:
+            attention.append(f"counter regression: PROGRESS.md records attempt {max(recorded)} but the Status block shows {counters['max attempts recorded in Status']}: do not reset retry budgets (only the user may)")
+    pending = [g["milestone"] for g in gates if not g["passed"].startswith("y") and (not g["review"] or g["review"] in ("no", "n/a", "pending"))]
+    if sget("failing checks") and sget("failing checks") not in ("-", "none"):
+        notes.append("failed checks recorded: " + clean(sget("failing checks")))
+    cmds = [g["command"] for g in gates if g["command"] and not g["passed"].startswith("y")]
+    nxt = []
+    if any(d["owner"] == "-" for d in dirty_report):
+        nxt.append("inspect the user's uncommitted changes first; do not commit or modify them")
+    if any(m["anchor"] in ("unknown", "missing", "invalid") for m in ms):
+        nxt.append("re-verify the milestones whose verified commit is unknown or missing")
+    nxt.append("re-run the current milestone's verification command(s) and compare with the recorded result" + (f" ({clean(cmds[0])[:80]})" if cmds else ""))
+    if stale:
+        nxt.append("re-verify the stale tasks before building on them")
+    if inprog:
+        nxt.append("resolve interrupted in-progress tasks: " + ", ".join(inprog))
+    nxt.append("then continue from the safest next task; never mark anything complete because a status says so")
+    return {"state": "present", "head": head[:12], "attention": attention, "notes": notes, "counters": counters,
+            "counters_note": "read-only: this tool never changes or resets counters; only the user may reset a budget",
+            "milestones": ms, "stale": stale, "dirty": dirty_report, "in_progress": inprog, "pending_review": pending, "next": nxt}
+
+
+def render_state(r):
+    out = []
+    if r["state"] == "none":
+        return "\n".join(["NO STATE"] + ["NOTE: " + clean(n) for n in r["notes"]])
+    out.append(f"HEAD {r['head']}  in-progress tasks: {', '.join(r['in_progress']) or '-'}  pending review: {', '.join(r['pending_review']) or '-'}")
+    for m in r["milestones"]:
+        out.append(f"milestone {clean(m['milestone'])}: verified-at {clean(m['sha'])[:12] or '-'} anchor={m['anchor']} changed-since={len(m['changed_since'])}")
+    out.append("counters: " + clean(json.dumps(r["counters"])))
+    out.append(clean(r["counters_note"]))
+    for d in r["dirty"]:
+        out.append(f"dirty: {clean(d['file'])}  owner={clean(d['owner'])}  -> {clean(d['who'])}")
+    for x in r["stale"]:
+        out.append(f"STALE: {x['task']}: {clean(x['reason'])} {clean(', '.join(x['files']))[:120]}")
+    for n in r["notes"]:
+        out.append("NOTE: " + clean(n))
+    for a in r["attention"]:
+        out.append("ATTENTION: " + clean(a))
+    out += ["next: " + clean(n) for n in r["next"]]
+    out.append("OK" if not r["attention"] else f"{len(r['attention'])} item(s) need attention")
+    return "\n".join(out)
+
+
 # --------------------------------------------------------------------------- commands
 
 def cmd_graph(args):
@@ -600,11 +794,21 @@ def main(argv=None):
     b.add_argument("report", nargs="?", default="docs/auto-builder/BROWSER-QA.md")
     b.add_argument("--root", default=".")
     b.add_argument("--json", action="store_true")
+    st = sub.add_parser("state", help="resume check: recorded state versus git and the working tree (read-only)")
+    st.add_argument("tasks", nargs="?", default="docs/auto-builder/TASKS.md")
+    st.add_argument("--progress", help="PROGRESS.md path (default: next to TASKS.md)")
+    st.add_argument("--root", default=".")
+    st.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     try:
         if args.command == "graph":
             result = cmd_graph(args)
             text = render(result)
+        elif args.command == "state":
+            result = cmd_state(args)
+            text = render_state(result)
+            print(json.dumps(result, indent=2) if args.json else text)
+            return 1 if result["attention"] else 0
         else:
             result = cmd_browser_report(args)
             text = render_report(result)

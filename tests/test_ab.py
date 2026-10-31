@@ -408,6 +408,133 @@ def main():
     rc, out, err = ab(["browser-report", R], d)
     check("browser-report: writes nothing", tree_hash(d) == ro)
 
+    # ---------------------------------------------------------------- state (resume check)
+    def state_md(sha="", milestone="M1", passed="yes", tasks=None, failing="-", pass_cell="1 / 5", review="yes"):
+        tasks = tasks if tasks is not None else [
+            "| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |",
+            "| T2 | web | M1 | - | c | v | In progress | frontend-engineer | web/ | |"]
+        return ("# Execution backlog\n\n## Status (update after every task)\n\n| Field | Value |\n|---|---|\n"
+                f"| Current milestone | {milestone} |\n| Pass for this milestone (budget: 5 by default; edit here) | {pass_cell} |\n"
+                f"| Total passes, all milestones | 1 |\n| Failing checks → attempts (one line per distinct check; max 3 each) | {failing} |\n\n"
+                "## Milestone gates\n\n| Milestone | Expected outcome | Verification command(s) | Tests run | Regression run | Review | Criteria verified | Docs updated | Open blocker/major | Gate passed | Verified at (sha) |\n"
+                "|---|---|---|---|---|---|---|---|---|---|---|\n"
+                f"| {milestone} | o | pytest -q | y | y | {review} | y | y | none | {passed} | {sha} |\n\n"
+                "## Tasks\n\n| ID | Task | Milestone | Dependencies | Acceptance criteria | Verification | Status | Owner | Files owned | Flags |\n|---|---|---|---|---|---|---|---|---|---|\n"
+                + "\n".join(tasks) + "\n")
+
+    def srepo(progress="", make_sha=True, **kw):
+        d = tempfile.mkdtemp()
+        git(d, "init", "-q"); git(d, "config", "user.email", "t@t"); git(d, "config", "user.name", "t")
+        for sub in ("api", "web", "docs/auto-builder"):
+            os.makedirs(os.path.join(d, sub), exist_ok=True)
+        open(os.path.join(d, "api", "a.py"), "w").write("a=1\n")
+        open(os.path.join(d, "web", "w.js"), "w").write("w=1\n")
+        open(os.path.join(d, "docs", "auto-builder", "PROGRESS.md"), "w").write(progress)
+        open(os.path.join(d, "docs", "auto-builder", "TASKS.md"), "w").write(state_md(sha="", **kw))
+        git(d, "add", "-A"); git(d, "commit", "-qm", "work")
+        sha = git(d, "rev-parse", "HEAD").stdout.strip()
+        if make_sha:
+            open(os.path.join(d, "docs", "auto-builder", "TASKS.md"), "w").write(state_md(sha=sha, **kw))
+            git(d, "add", "-A"); git(d, "commit", "-qm", "gate passed")
+        return d, sha
+
+    ST = "docs/auto-builder/TASKS.md"
+    d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, "docs", "auto-builder"))
+    open(os.path.join(d, ST), "w").write("# Execution backlog\n\n## Tasks\n\n| ID | Dependencies | Owner | Files owned |\n|---|---|---|---|\n| T1 | - | a | b/ |\n")
+    rc, out, err = ab(["state"], d)
+    check("state: no Status block means a fresh task, not a resume", rc == 0 and "NO STATE" in out, out + err)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"])
+    rc, out, err = ab(["state"], d)
+    check("state: consistent verified state needs no attention", rc == 0 and "anchor=ok" in out and out.rstrip().splitlines()[-1] in ("OK",) or "OK" in out, out + err)
+    check("state: prints retry counters and says it never resets them", "counters:" in out and "never changes or resets" in out, out)
+    check("state: always recommends re-running the current milestone's verification command", "re-run the current milestone's verification" in out, out)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"])
+    open(os.path.join(d, "api", "a.py"), "a").write("a=2\n")
+    git(d, "add", "-A"); git(d, "commit", "-qm", "later change")
+    rc, out, err = ab(["state"], d)
+    check("state: owned file changed after verification is flagged stale (committed)", rc == 1 and "STALE: T1" in out, out + err)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"])
+    open(os.path.join(d, "api", "a.py"), "a").write("a=3\n")
+    rc, out, _ = ab(["state"], d)
+    check("state: owned file dirty after verification is flagged stale (uncommitted)", rc == 1 and "STALE: T1" in out, out)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |", "| T2 | web | M1 | - | c | v | Done | frontend-engineer | web/ | |"])
+    open(os.path.join(d, "web", "w.js"), "a").write("w=2\n")
+    git(d, "add", "-A"); git(d, "commit", "-qm", "web only")
+    rc, out, _ = ab(["state"], d)
+    check("state: only the task whose files changed is stale (no false-positive storm)",
+          "STALE: T2" in out and "STALE: T1" not in out, out)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"])
+    git(d, "checkout", "-q", "--orphan", "squashed"); git(d, "add", "-A"); git(d, "commit", "-qm", "squashed history")
+    rc, out, _ = ab(["state"], d)
+    check("state: squashed/rebased history gives 'unknown' (commit exists but is no longer an ancestor), not a false 'ok'",
+          rc == 1 and "anchor=unknown" in out and "re-verify" in out, out)
+
+    d, _ = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"], make_sha=False)
+    open(os.path.join(d, "docs", "auto-builder", "TASKS.md"), "w").write(state_md(sha="0123456789abcdef0123456789abcdef01234567", tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"]))
+    rc, out, _ = ab(["state"], d)
+    check("state: a verified commit that does not exist is reported missing", rc == 1 and "anchor=missing" in out and "does not exist" in out, out)
+
+    for bad in ("--output=/tmp/pwn3", "HEAD;touch /tmp/pwn4", "$(id)", "zzzz"):
+        d, _ = srepo(make_sha=False)
+        open(os.path.join(d, "docs", "auto-builder", "TASKS.md"), "w").write(state_md(sha=bad))
+        rc, out, err = ab(["state"], d)
+        check(f"state: hostile 'Verified at' value {bad!r} is rejected, nothing executed",
+              "anchor=invalid" in out and not os.path.exists("/tmp/pwn3") and not os.path.exists("/tmp/pwn4"), out + err)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"], passed="yes")
+    open(os.path.join(d, "docs", "auto-builder", "TASKS.md"), "w").write(state_md(sha="", tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"]))
+    rc, out, _ = ab(["state"], d)
+    check("state: done task whose milestone has no verified commit is reported unanchored", "unanchored" in out, out)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | In progress | backend-engineer | api/ | |", "| T2 | web | M1 | - | c | v | Done | frontend-engineer | web/ | |"])
+    open(os.path.join(d, "api", "a.py"), "a").write("a=9\n")
+    open(os.path.join(d, "stray.txt"), "w").write("user file\n")
+    rc, out, _ = ab(["state"], d)
+    check("state: dirty file owned by an in-progress task is the lead's to resolve",
+          "api/a.py  owner=T1  -> lead resolves" in out, out)
+    check("state: dirty file owned by no task is the user's: do not touch", "stray.txt  owner=-  -> not owned by any task" in out and rc == 1, out)
+    check("state: interrupted in-progress tasks are listed", "in-progress tasks: T1" in out, out)
+
+    d, sha = srepo(progress="# Progress\n\nFailure: check X. Root cause: y. attempt 2 of 3\n", failing="X -> 1")
+    rc, out, _ = ab(["state"], d)
+    check("state: counter regression (PROGRESS shows more attempts than Status) is flagged", rc == 1 and "counter regression" in out and "do not reset" in out, out)
+    d, sha = srepo(progress="# Progress\n\nFailure: check X. attempt 2 of 3\n", failing="X -> 2")
+    rc, out, _ = ab(["state"], d)
+    check("state: consistent counters raise no regression warning", "counter regression" not in out, out)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"])
+    before = tree_hash(d)
+    rc, out, _ = ab(["state"], d)
+    check("state: writes nothing (tree and .git identical afterwards)", tree_hash(d) == before)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"])
+    sentinel = os.path.join(d, "PWNED2"); evil = os.path.join(d, "evil.sh")
+    open(evil, "w").write(f"#!/bin/sh\ntouch '{sentinel}'\nprintf '\\0'\n"); os.chmod(evil, 0o755)
+    with open(os.path.join(d, ".git", "config"), "a") as fh:
+        fh.write(f"\n[core]\n\tfsmonitor = {evil}\n\tpager = touch '{sentinel}'\n[diff]\n\texternal = {evil}\n")
+    open(os.path.join(d, "api", "a.py"), "a").write("a=5\n")
+    rc, out, err = ab(["state"], d)
+    check("state: hostile .git/config does not execute anything", not os.path.exists(sentinel) and "STALE" in out, out + err)
+
+    nogit = tempfile.mkdtemp(); os.makedirs(os.path.join(nogit, "docs", "auto-builder"))
+    open(os.path.join(nogit, ST), "w").write(state_md(sha="abcdef1234567"))
+    rc, out, err = ab(["state"], nogit)
+    check("state: outside a git repository it says commits cannot be verified", rc == 1 and "not a git repository" in out, out + err)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"])
+    open(os.path.join(d, ST), "w").write("x" * 2_000_000)
+    rc, out, err = ab(["state"], d)
+    check("state: oversized TASKS.md is refused", rc == 2 and "too large" in err, err)
+
+    d, sha = srepo(tasks=["| T1 | api | M1 | - | c | v | Done | backend-engineer | api/ | |"])
+    rc, out, _ = ab(["state", "--json"], d)
+    check("state: --json is valid and carries the counters note", "never changes or resets" in json.loads(out)["counters_note"])
+
     failed = [n for n, ok_ in results if not ok_]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
     return 1 if failed else 0

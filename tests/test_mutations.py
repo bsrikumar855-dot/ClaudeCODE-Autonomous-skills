@@ -54,6 +54,13 @@ MUTATIONS = [
     ("browser-report drops the notice", f"{SK}/scripts/ab.py", "FORMAT CHECK ONLY", "OK", "FORMAT CHECK ONLY"),
     ("tdd allows weakening checks", f"{SK}/workflows/tdd.md", "**Never weaken the check**", "Weakening is fine", "never weaken the check"),
     ("SKILL drops the not-performed rule", f"{SK}/SKILL.md", 'say "browser QA not performed"', 'say nothing', "'not performed' rule"),
+    ("recovery lets a restart reset budgets", f"{SK}/workflows/session-recovery.md", "**Retry budgets are not reset by restarting.**", "Retry budgets reset on restart.", "retry budgets are not reset by restarting"),
+    ("recovery trusts recorded status", f"{SK}/workflows/session-recovery.md", "Never assume a task is complete because its status says so;", "Trust the status;", "never assume a task is complete"),
+    ("recovery lets the skill apply its own proposals", f"{SK}/workflows/session-recovery.md", "You never apply it", "You may apply it", "you never apply it"),
+    ("lessons template merges proposals into lessons", f"{SK}/templates/LESSONS.md", "## Proposals for AUTO-BUILDER (never applied by the skill; the user decides)", "## Notes", "proposals for auto-builder"),
+    ("state check loses the counter-regression warning", f"{SK}/scripts/ab.py", "counter regression:", "counter note:", "counter regression"),
+    ("state check can claim anchors after a rebase", f"{SK}/scripts/ab.py", "is not an ancestor of HEAD", "is fine", "not an ancestor of HEAD"),
+    ("init-artifacts accepts any name", f"{SK}/scripts/init-artifacts.sh", "invalid template name", "ok", "must validate names"),
     ("3-attempt limit defined twice", f"{SK}/SKILL.md", "Iteration limits are defined once: **3** attempts", "Iteration limits: 3 fix attempts and **3** attempts", "defined exactly once"),
 ]
 
