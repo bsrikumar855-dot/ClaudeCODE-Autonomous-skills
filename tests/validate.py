@@ -595,6 +595,25 @@ def check_recovery():
     ok("invalid template name" in ia and "no such template" in ia and "never overwrites" in ia.lower(), "init-artifacts.sh must validate names and never overwrite")
 
 
+def check_release():
+    """Delivery operations: approval model, caps by reference, untrusted comments, no bypass."""
+    rel_md = open(os.path.join(SKILL_DIR, "playbooks", "release.md"), encoding="utf-8").read().lower()
+    for ph in ("never pushes, merges, tags, releases or deploys on its own", "untrusted data", "commands are never executed",
+               "pr review", "comment triage", "security-engineer", "never change code merely to quiet a bot", "ci inspection",
+               "failed-check diagnosis", "flake only if a single fresh run passes", "never weaken tests", "skip hooks",
+               "edit ci/workflow files", "bypass a required check", "changelog entry", "version bump proposal", "documentation synchronization",
+               "only when the user explicitly asks", "each push needs its own approval", "names the branch and the number of rounds",
+               "never covers force-push, merge, mark-ready, tag, release or deploy", "allowed commands", "gh pr view", "`git push` of the named branch",
+               "no `--force`", "no `gh pr merge`", "no `gh pr ready`", "no `gh release`", "skill.md limits", "stop at \"ready\"",
+               "never print tokens", "http 200", "explicit approval"):
+        ok(ph in rel_md, f"release.md missing: '{ph}'")
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read().lower()
+    lim = section(skill, "limits", "##")
+    for ph in ("3 fix-push-recheck rounds", "5 status reads", "at least 60 s apart", "20 minutes", "1 hour elapsed", "stop and report"):
+        ok(ph in lim, f"SKILL.md Limits missing the babysitting cap: '{ph}'")
+    ok("pushing, opening prs" in skill and "force-push" in skill, "SKILL.md approval policy must keep push/PR/force-push as ask-first")
+
+
 def check_security():
     """The security-engineer agent and the Security gate must exist and be wired into the lifecycle."""
     path = os.path.join(AGENT_DIR, "security-engineer.md")
@@ -700,6 +719,7 @@ def main():
     check_ab()
     check_verification2()
     check_recovery()
+    check_release()
     check_hygiene()
     if errors:
         print(f"FAILED: {len(errors)} problem(s) in {checks} checks")

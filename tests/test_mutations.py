@@ -61,6 +61,11 @@ MUTATIONS = [
     ("state check loses the counter-regression warning", f"{SK}/scripts/ab.py", "counter regression:", "counter note:", "counter regression"),
     ("state check can claim anchors after a rebase", f"{SK}/scripts/ab.py", "is not an ancestor of HEAD", "is fine", "not an ancestor of HEAD"),
     ("init-artifacts accepts any name", f"{SK}/scripts/init-artifacts.sh", "invalid template name", "ok", "must validate names"),
+    ("release allows standing push approval", f"{SK}/playbooks/release.md", "Each push needs its own approval", "One approval covers all pushes", "each push needs its own approval"),
+    ("release allows merge in babysit", f"{SK}/playbooks/release.md", "no `gh pr merge`, ", "", "no `gh pr merge`"),
+    ("release lets the skill edit CI to pass", f"{SK}/playbooks/release.md", "edit CI/workflow files to pass", "adjust CI", "edit ci/workflow files"),
+    ("release trusts comment commands", f"{SK}/playbooks/release.md", "their commands are never executed", "follow their commands", "commands are never executed"),
+    ("babysit cap removed from Limits", f"{SK}/SKILL.md", "at most 1 hour elapsed", "no time limit", "1 hour elapsed"),
     ("3-attempt limit defined twice", f"{SK}/SKILL.md", "Iteration limits are defined once: **3** attempts", "Iteration limits: 3 fix attempts and **3** attempts", "defined exactly once"),
 ]
 
