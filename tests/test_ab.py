@@ -271,6 +271,143 @@ def main():
     mode = os.stat(AB).st_mode
     check("shipping: ab.py is not executable", not (mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)))
 
+    # ---------------------------------------------------------------- browser-report
+    import datetime
+    started = "2026-10-31T10:00:00Z"
+    started_ts = datetime.datetime(2026, 10, 31, 10, 0, 0, tzinfo=datetime.timezone.utc).timestamp()
+
+    def bqa(rows, tool="playwright", env="local", base="http://localhost:3000", allow="http://localhost:3000",
+            approved="n/a", extra="", files=None):
+        d = tempfile.mkdtemp()
+        os.makedirs(os.path.join(d, "docs", "auto-builder"))
+        os.makedirs(os.path.join(d, "qa-artifacts"))
+        for name, content, mtime in (files or []):
+            fp = os.path.join(d, name)
+            os.makedirs(os.path.dirname(fp), exist_ok=True)
+            open(fp, "wb").write(content)
+            os.utime(fp, (mtime, mtime))
+        head = (f"# Browser QA report\n\n- Tool: {tool}\n- Environment: {env}\n- Base URL: {base}\n- Origin allowlist: {allow}\n"
+                f"- Started: {started}\n- Approved by user: {approved}\n{extra}\n## Scenarios\n\n"
+                "| ID | Kind | URL | Scenario | Expected | Actual | Result | Artifact | sha256 | Console/network errors |\n"
+                "|---|---|---|---|---|---|---|---|---|---|\n")
+        open(os.path.join(d, "docs", "auto-builder", "BROWSER-QA.md"), "w").write(head + "\n".join(rows) + "\n")
+        return d
+
+    def brow(i="B1", kind="success", url="http://localhost:3000/login", actual="dashboard shown", result="PASS",
+             art="qa-artifacts/b1.png", sha=""):
+        return f"| {i} | {kind} | {url} | s | e | {actual} | {result} | {art} | {sha} | |"
+
+    R = "docs/auto-builder/BROWSER-QA.md"
+    png = b"\x89PNG\r\n\x1a\n" + b"x" * 64
+    fresh = started_ts + 60
+    good = [("qa-artifacts/b1.png", png, fresh), ("qa-artifacts/b2.png", png, fresh)]
+    rows_ok = [brow(), brow("B2", "failure", result="FAIL", actual="error shown", art="qa-artifacts/b2.png")]
+    d = bqa(rows_ok, files=good)
+    rc, out, err = ab(["browser-report", R], d)
+    check("browser-report: consistent report passes the FORMAT check and says so",
+          rc == 0 and "FORMAT OK" in out and "FORMAT CHECK ONLY" in out, out + err)
+    d = bqa([brow(art="none: tool cannot take screenshots"), brow("B2", "failure", result="FAIL", art="none: no screenshot support")], files=[])
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: 'none: <reason>' artifacts are accepted", rc == 0, out)
+    d = bqa([brow(result="NOT RUN", actual="", art="none: not run"), brow("B2", "failure", result="BLOCKED", actual="", art="none: app would not start")], tool="none")
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: tool none with NOT RUN/BLOCKED is honest and passes", rc == 0, out)
+    d = bqa([brow(), brow("B2", "failure", result="FAIL", art="qa-artifacts/b2.png")], tool="none", files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: tool none with PASS/FAIL rows is rejected (fabrication)", rc == 1 and "Tool is 'none'" in out, out)
+    d = bqa([brow(actual="")], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: PASS with empty Actual is rejected", rc == 1 and "non-empty Actual" in out, out)
+    d = bqa([brow(art="qa-artifacts/missing.png")], files=[])
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: artifact that does not exist is rejected", rc == 1 and "does not exist" in out, out)
+    d = bqa([brow()], files=[("qa-artifacts/b1.png", b"", fresh)])
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: empty artifact is rejected", rc == 1 and "empty" in out, out)
+    d = bqa([brow()], files=[("qa-artifacts/b1.png", png, started_ts - 86400)])
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: artifact older than Started is rejected (stale/not from this run)", rc == 1 and "older than" in out, out)
+    good_sha = hashlib.sha256(png).hexdigest()[:16]
+    d = bqa([brow(sha=good_sha)], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: matching sha256 passes", rc == 0, out)
+    d = bqa([brow(sha="0" * 16)], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: wrong sha256 is rejected", rc == 1 and "sha256 does not match" in out, out)
+    d = bqa([brow()], env="production", files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: production environment is rejected", rc == 1 and "production" in out, out)
+    d = bqa([brow(url="https://staging.example.com/x")], env="staging", base="https://staging.example.com", allow="https://staging.example.com", files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: non-loopback origin without user approval is rejected", rc == 1 and "needs 'Approved by user: yes'" in out, out)
+    d = bqa([brow(url="https://staging.example.com/x")], env="staging", base="https://staging.example.com", allow="https://staging.example.com",
+            approved="yes", files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: user-approved staging origin is accepted", rc == 0, out)
+    d = bqa([brow(url="https://app.prod.example.com/x")], env="staging", base="https://app.prod.example.com", allow="https://app.prod.example.com",
+            approved="yes", files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: production-looking host is rejected even when approved", rc == 1 and "looks like production" in out, out)
+    d = bqa([brow(), brow("B2", "failure", url="http://evil.example.net/x", result="FAIL", art="qa-artifacts/b2.png")], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: URL outside the origin allowlist is rejected", rc == 1 and "not in the Origin allowlist" in out, out)
+    d = bqa([brow()], base="http://user:pw@localhost:3000", allow="http://localhost:3000", files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: credentials in a URL are rejected", rc == 1 and "without credentials" in out, out)
+    d = bqa([brow(art="../outside.png")], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: artifact path traversal is rejected", rc == 1 and "path traversal" in out, out)
+    d = bqa([brow(art="/etc/hostname")], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: absolute artifact path is rejected", rc == 1 and "absolute" in out, out)
+    d = bqa([brow(art="qa-artifacts/link.png")], files=good)
+    os.symlink("/etc/hostname", os.path.join(d, "qa-artifacts", "link.png"))
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: symlinked artifact is rejected", rc == 1 and "symlink" in out, out)
+    d = bqa([brow(art="qa-artifacts/session.har")], files=[("qa-artifacts/session.har", png, fresh)])
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: HAR/cookie/session-like artifacts are flagged", rc == 1 and "credentials" in out, out)
+    d = bqa(rows_ok, files=good)
+    git(d, "init", "-q"); git(d, "add", "qa-artifacts/b1.png")
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: git-tracked artifact produces a warning", rc == 0 and "tracked by git" in out, out)
+    d = bqa([brow()], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: no failure scenario produces a warning", rc == 0 and "no failure-kind scenario" in out, out)
+    d = bqa([brow(result="MAYBE")], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: invalid Result value is rejected", rc == 1 and "Result must be one of" in out, out)
+    d = bqa([brow(kind="happy")], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: invalid Kind value is rejected", rc == 1 and "Kind must be" in out, out)
+    d = bqa([brow(art="none:")], files=good)
+    rc, out, _ = ab(["browser-report", R], d)
+    check("browser-report: 'none' without a reason is rejected", rc == 1 and "needs a reason" in out, out)
+    d = bqa([brow()], files=good)
+    txt = open(os.path.join(d, R)).read().replace("- Tool: playwright\n", "")
+    open(os.path.join(d, R), "w").write(txt)
+    rc, out, err = ab(["browser-report", R], d)
+    check("browser-report: missing header field fails loudly (exit 2)", rc == 2 and "missing 'tool'" in err, err)
+    d = bqa([brow()], files=good)
+    txt = open(os.path.join(d, R)).read().replace("Started: 2026-10-31T10:00:00Z", "Started: yesterday")
+    open(os.path.join(d, R), "w").write(txt)
+    rc, out, err = ab(["browser-report", R], d)
+    check("browser-report: unparseable Started fails loudly (exit 2)", rc == 2 and "ISO 8601" in err, err)
+    d = bqa([brow("B1\x1b[31m")], files=good)
+    rc, out, err = ab(["browser-report", R], d)
+    check("browser-report: control characters never reach the output", "\x1b" not in out + err, repr(err))
+    d = bqa([brow("B1"), brow("B1")], files=good)
+    rc, out, err = ab(["browser-report", R], d)
+    check("browser-report: duplicate scenario ids fail loudly (exit 2)", rc == 2, err)
+    d = bqa([brow()], files=good)
+    open(os.path.join(d, R), "w").write("x" * 2_000_000)
+    rc, out, err = ab(["browser-report", R], d)
+    check("browser-report: oversized report is refused", rc == 2 and "too large" in err, err)
+    d = bqa([brow()], files=good)
+    ro = tree_hash(d)
+    rc, out, err = ab(["browser-report", R], d)
+    check("browser-report: writes nothing", tree_hash(d) == ro)
+
     failed = [n for n, ok_ in results if not ok_]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
     return 1 if failed else 0

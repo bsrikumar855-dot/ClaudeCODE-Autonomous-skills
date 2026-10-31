@@ -48,6 +48,12 @@ MUTATIONS = [
     ("swarm lets parallelism bypass gates", f"{SK}/workflows/swarm.md", "**Parallelism never bypasses a gate.**", "Parallelism is fast.", "parallelism never bypasses a gate"),
     ("review drops reproduce-or-drop", f"{SK}/workflows/independent-review.md", "## Reproduce or drop", "## Reproduce", "reproduce or drop"),
     ("review allows implicit external review", f"{SK}/workflows/independent-review.md", "explicit approval **for this run**", "approval", "for this run"),
+    ("browser QA allows simulation", f"{SK}/workflows/browser-qa.md", "Never simulate a browser, invent a screenshot, or write PASS without having run it.", "Simulate if needed.", "never simulate"),
+    ("browser QA drops the origin allowlist", f"{SK}/workflows/browser-qa.md", "origin allowlist", "origin list", "origin allowlist"),
+    ("browser QA lets the checker be cited", f"{SK}/workflows/browser-qa.md", "**never cite the checker as verification**", "cite the checker", "never cite the checker as verification"),
+    ("browser-report drops the notice", f"{SK}/scripts/ab.py", "FORMAT CHECK ONLY", "OK", "FORMAT CHECK ONLY"),
+    ("tdd allows weakening checks", f"{SK}/workflows/tdd.md", "**Never weaken the check**", "Weakening is fine", "never weaken the check"),
+    ("SKILL drops the not-performed rule", f"{SK}/SKILL.md", 'say "browser QA not performed"', 'say nothing', "browser qa not performed"),
     ("3-attempt limit defined twice", f"{SK}/SKILL.md", "Iteration limits are defined once: **3** attempts", "Iteration limits: 3 fix attempts and **3** attempts", "defined exactly once"),
 ]
 

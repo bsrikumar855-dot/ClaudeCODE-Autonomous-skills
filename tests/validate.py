@@ -447,7 +447,7 @@ def check_router():
     ok("| Flags |" in tasks and "Verified at (sha)" in tasks and "Strict grammar" in tasks, "TASKS.md template needs Flags, Verified at (sha) and the strict-grammar note")
 
 
-AB_IMPORT_ALLOW = {"argparse", "fnmatch", "json", "os", "re", "subprocess", "sys", "hashlib", "stat"}
+AB_IMPORT_ALLOW = {"argparse", "fnmatch", "json", "os", "re", "subprocess", "sys", "hashlib", "stat", "datetime"}
 AB_FORBIDDEN_OS = {"system", "popen", "remove", "unlink", "rename", "replace", "mkdir", "makedirs", "rmdir", "chmod",
                    "chown", "symlink", "link", "write", "truncate", "utime", "putenv", "execv", "execl", "spawnl", "fork"}
 AB_FORBIDDEN_NAMES = {"eval", "exec", "compile", "__import__", "input", "breakpoint"}
@@ -528,6 +528,38 @@ def check_ab():
                "do not approve by default", "state what you did **not** check", "never the default"):
         ok(ph in rev, f"independent-review.md missing: '{ph}'")
     ok("workflows/swarm.md" in skill and "workflows/independent-review.md" in skill, "SKILL.md must link swarm and fresh-context review")
+
+
+def check_verification2():
+    """Browser QA and test-first workflows, the report template, and the checker's contract."""
+    wf = os.path.join(SKILL_DIR, "workflows")
+    bq = open(os.path.join(wf, "browser-qa.md"), encoding="utf-8").read().lower()
+    for ph in ("bring-your-own-browser", "you (the lead) write", "no browser tools", "cannot write files", "project's own end-to-end suite",
+               "specific journeys", "browser qa not performed", "untested", "never simulate", "invent a screenshot", "origin allowlist",
+               "approved by user: yes", "never production", "ephemeral profile", "test accounts", "test mode", "untrusted data",
+               "git-ignored", "success** scenario and a **failure", "console errors", "failed network requests", "375, 768 and 1280",
+               "registration", "login", "file upload", "payment", "agent tool-authorization", "ab.py browser-report", "format and internal consistency",
+               "proves **no behaviour**", "never cite the checker as verification", "open at least one artifact", "harder, not impossible",
+               "same counters", "dev** dependency", "expected, actual, pass or fail"):
+        ok(ph in bq, f"browser-qa.md missing: '{ph}'")
+    tdd = open(os.path.join(wf, "tdd.md"), encoding="utf-8").read().lower()
+    for ph in ("fails for the right reason", "smallest change", "regression", "never weaken the check", "failing-before", "passing-after",
+               "narrowest existing test type", "cannot edit files"):
+        ok(ph in tdd, f"tdd.md missing: '{ph}'")
+    tpl = open(os.path.join(SKILL_DIR, "templates", "BROWSER-QA.md"), encoding="utf-8").read()
+    for h in ("- Tool:", "- Environment:", "- Base URL:", "- Origin allowlist:", "- Started:", "- Approved by user:", "## Scenarios",
+              "| ID | Kind | URL | Scenario | Expected | Actual | Result | Artifact | sha256 |", "NOT RUN", "none: "):
+        ok(h in tpl, f"BROWSER-QA.md template missing: {h}")
+    ab = open(os.path.join(SKILL_DIR, "scripts", "ab.py"), encoding="utf-8").read()
+    for ph in ("FORMAT CHECK ONLY", "must not be cited as verification", "Origin allowlist", "production", "Approved by user",
+               "older than the report", "tracked by git", "credentials", "sha256", "MAX_ARTIFACT_BYTES"):
+        ok(ph in ab, f"ab.py browser-report missing: '{ph}'")
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    ok("browser qa not performed" in skill.lower() and "workflows/browser-qa.md" in skill and "workflows/tdd.md" in skill,
+       "SKILL.md must wire browser QA (with the 'not performed' rule) and test-first")
+    for pbk, ref in (("feature.md", "workflows/tdd.md"), ("feature.md", "workflows/browser-qa.md"), ("bug-fix.md", "workflows/tdd.md")):
+        ok(ref in open(os.path.join(SKILL_DIR, "playbooks", pbk), encoding="utf-8").read(), f"playbooks/{pbk} must reference {ref}")
+    ok("BROWSER-QA.md" in skill, "SKILL.md state files must list BROWSER-QA.md")
 
 
 def check_security():
@@ -633,6 +665,7 @@ def main():
     check_security()
     check_router()
     check_ab()
+    check_verification2()
     check_hygiene()
     if errors:
         print(f"FAILED: {len(errors)} problem(s) in {checks} checks")

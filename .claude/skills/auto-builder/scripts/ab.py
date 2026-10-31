@@ -5,9 +5,11 @@ Run it as:  python3 -I ab.py <command> [options]   (-I = isolated mode: nothing 
 from the current directory, which is the user's project)
 
 Commands
-  graph   Validate the task table in TASKS.md, compute parallel waves, detect ownership
-          conflicts, and (optionally) check that the files actually changed stay inside the
-          declared ownership.
+  graph           Validate the task table in TASKS.md, compute parallel waves, detect ownership
+                  conflicts, and (optionally) check that the files actually changed stay inside
+                  the declared ownership.
+  browser-report  Check the FORMAT and internal consistency of a BROWSER-QA.md report. It proves
+                  nothing about behaviour and must never be cited as verification.
 
 Design rules (enforced by tests/test_ab.py):
   * read-only: no file writes, no deletes, no network, no eval/exec, no shell;
@@ -23,11 +25,14 @@ import os
 import re
 import subprocess
 import sys
+import hashlib
+import datetime
 
 MAX_FILE_BYTES = 1_000_000
 MAX_LINES = 20_000
 MAX_ROWS = 500
 MAX_GIT_OUTPUT = 5_000_000
+MAX_ARTIFACT_BYTES = 50_000_000
 MAX_WORKERS_PER_WAVE = 4  # must equal the "concurrent workers per wave" cap in SKILL.md Limits
 
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,30}$")
@@ -356,6 +361,183 @@ def check_changes(tasks, wave_ids, changed):
     return problems
 
 
+# --------------------------------------------------------------------------- browser report
+
+BQA_TOOLS = {"project-e2e", "session-browser", "playwright", "headless-chrome", "none"}
+BQA_ENVS = {"local", "staging", "test"}
+BQA_RESULTS = {"PASS", "FAIL", "NOT RUN", "BLOCKED"}
+BQA_KINDS = {"success", "failure"}
+LOOPBACK = re.compile(r"^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|[a-z0-9-]+\.localhost)$", re.I)
+URL_RE = re.compile(r"^(https?)://([^/:@\s]+|\[[0-9a-fA-F:]+\])(:\d{1,5})?(/[^\s]*)?$")
+SENSITIVE_ART = re.compile(r"(\.har$|trace\.zip$|cookie|storage[-_]?state|session|token|credential|secret|\.sqlite$)", re.I)
+
+
+def origin_of(url):
+    m = URL_RE.match(url.strip())
+    if not m:
+        return None, None
+    scheme, host, port = m.group(1).lower(), m.group(2).lower(), m.group(3) or ""
+    return host, f"{scheme}://{host}{port}"
+
+
+def parse_header(text):
+    head = text.split("\n## ", 1)[0]
+    kv = {}
+    for line in head.splitlines():
+        m = re.match(r"^\s*[-*]\s*([A-Za-z][A-Za-z /-]*?)\s*:\s*(.*)$", line)
+        if m:
+            kv[m.group(1).strip().lower()] = m.group(2).strip()
+    return kv
+
+
+def parse_started(value):
+    v = value.strip().replace("Z", "+00:00").replace(" ", "T", 1)
+    try:
+        dt = datetime.datetime.fromisoformat(v)
+    except ValueError:
+        raise Problem("Started must be an ISO 8601 timestamp, e.g. 2026-10-31T10:00:00Z")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.timestamp()
+
+
+def tracked_by_git(root, rel):
+    rc, out = run_git(root, ["ls-files", "-z", "--", rel])
+    return rc == 0 and bool(out.strip(b"\0"))
+
+
+def cmd_browser_report(args):
+    root = resolve_root(args.root)
+    text = read_text(args.report, root)
+    hdr = parse_header(text)
+    for key in ("tool", "environment", "base url", "started", "origin allowlist"):
+        if not hdr.get(key):
+            raise Problem(f"report header is missing '{key}'")
+    errors, warnings = [], []
+    tool = hdr["tool"].lower()
+    if tool not in BQA_TOOLS:
+        errors.append(f"Tool must be one of {sorted(BQA_TOOLS)}")
+    env = hdr["environment"].lower()
+    if env == "production":
+        errors.append("Environment 'production' is not allowed: browser QA never targets production")
+    elif env not in BQA_ENVS:
+        errors.append(f"Environment must be one of {sorted(BQA_ENVS)}")
+    started = parse_started(hdr["started"])
+    approved = hdr.get("approved by user", "").lower().startswith("yes")
+    allow = set()
+    for item in re.split(r"[,\s]+", hdr["origin allowlist"]):
+        if not item:
+            continue
+        host, origin = origin_of(item)
+        if origin is None:
+            errors.append(f"allowlist entry is not a valid http(s) origin without credentials: {clean(item)[:60]}")
+        else:
+            allow.add(origin)
+            if not LOOPBACK.match(host) and not (approved and env in ("staging", "test")):
+                errors.append(f"non-loopback origin {clean(origin)[:60]} needs 'Approved by user: yes' and Environment staging/test")
+            if re.search(r"(^|[.-])(prod|production|www)([.-]|$)", host) and env != "test":
+                errors.append(f"origin {clean(origin)[:60]} looks like production")
+    base_host, base_origin = origin_of(hdr["base url"])
+    if base_origin is None:
+        errors.append("Base URL is not a valid http(s) URL without credentials")
+    elif base_origin not in allow:
+        errors.append("Base URL origin is not in the Origin allowlist")
+    header, rows = find_table(text, "Scenarios")
+    col = {n: i for i, n in enumerate(header)}
+    need = ["id", "kind", "url", "scenario", "expected", "actual", "result", "artifact"]
+    missing = [n for n in need if n not in col]
+    if missing:
+        raise Problem("scenario table missing column(s): " + ", ".join(missing))
+    seen, counts, has_failure_kind, checked = set(), {"PASS": 0, "FAIL": 0, "NOT RUN": 0, "BLOCKED": 0}, False, 0
+    for r in rows:
+        r = r + [""] * (len(header) - len(r))
+        sid = r[col["id"]]
+        if not ID_RE.match(sid):
+            raise Problem(f"invalid scenario id {clean(sid)[:30]!r}")
+        if sid in seen:
+            raise Problem(f"duplicate scenario id {sid}")
+        seen.add(sid)
+        kind, result = r[col["kind"]].lower(), r[col["result"]].upper()
+        actual, artifact = r[col["actual"]].strip(), r[col["artifact"]].strip()
+        if kind not in BQA_KINDS:
+            errors.append(f"{sid}: Kind must be success or failure")
+        has_failure_kind = has_failure_kind or kind == "failure"
+        if result not in BQA_RESULTS:
+            errors.append(f"{sid}: Result must be one of {sorted(BQA_RESULTS)}")
+            continue
+        counts[result] += 1
+        host, origin = origin_of(r[col["url"]])
+        if origin is None:
+            errors.append(f"{sid}: URL is not a valid http(s) URL without credentials")
+        elif origin not in allow:
+            errors.append(f"{sid}: URL origin {clean(origin)[:60]} is not in the Origin allowlist")
+        if tool == "none" and result in ("PASS", "FAIL"):
+            errors.append(f"{sid}: Tool is 'none', so a result of {result} cannot be real (use NOT RUN or BLOCKED)")
+        if result in ("PASS", "FAIL"):
+            if not actual:
+                errors.append(f"{sid}: {result} needs a non-empty Actual")
+            if not artifact:
+                errors.append(f"{sid}: {result} needs an Artifact path or 'none: <reason>'")
+        if not artifact:
+            continue
+        if artifact.lower().startswith("none"):
+            if not re.match(r"^none\s*:\s*\S+", artifact, flags=re.I):
+                errors.append(f"{sid}: Artifact 'none' needs a reason ('none: <reason>')")
+            continue
+        bad = safe_owned_path(artifact)
+        if bad:
+            errors.append(f"{sid}: artifact {clean(bad)}")
+            continue
+        full = os.path.join(root, artifact)
+        try:
+            st = os.lstat(full)
+        except OSError:
+            errors.append(f"{sid}: artifact does not exist: {clean(artifact)[:80]}")
+            continue
+        if os.path.islink(full) or not os.path.isfile(full):
+            errors.append(f"{sid}: artifact must be a regular file, not a symlink or directory")
+            continue
+        if os.path.commonpath([os.path.realpath(full), root]) != root:
+            errors.append(f"{sid}: artifact escapes the project root")
+            continue
+        checked += 1
+        if st.st_size == 0:
+            errors.append(f"{sid}: artifact is empty")
+        if st.st_mtime < started - 1:
+            errors.append(f"{sid}: artifact is older than the report's Started time (not produced by this run)")
+        if SENSITIVE_ART.search(artifact):
+            errors.append(f"{sid}: artifact name suggests cookies, tokens, sessions or HAR/trace data; do not keep credentials-bearing files")
+        sha = r[col["sha256"]].strip().lower() if "sha256" in col else ""
+        if sha:
+            if not re.fullmatch(r"[0-9a-f]{12,64}", sha):
+                errors.append(f"{sid}: sha256 must be 12-64 hex characters")
+            elif st.st_size <= MAX_ARTIFACT_BYTES:
+                with open(full, "rb") as fh:
+                    digest = hashlib.sha256(fh.read(MAX_ARTIFACT_BYTES + 1)).hexdigest()
+                if not digest.startswith(sha):
+                    errors.append(f"{sid}: sha256 does not match the artifact")
+        if tracked_by_git(root, artifact):
+            warnings.append(f"{sid}: artifact is tracked by git; keep artifacts in a git-ignored directory")
+    if rows and not has_failure_kind and not hdr.get("no failure scenarios because"):
+        warnings.append("no failure-kind scenario: important journeys need a failure path (or state 'No failure scenarios because: ...')")
+    if not rows:
+        warnings.append("no scenarios in the report")
+    return {"errors": errors, "warnings": warnings, "counts": counts, "scenarios": len(rows), "artifacts_checked": checked,
+            "tool": tool, "environment": env,
+            "notice": "FORMAT CHECK ONLY: this proves no behaviour and must not be cited as verification; open at least one artifact."}
+
+
+def render_report(result):
+    out = [f"tool={result['tool']} environment={result['environment']} scenarios={result['scenarios']} "
+           f"PASS={result['counts']['PASS']} FAIL={result['counts']['FAIL']} NOT RUN={result['counts']['NOT RUN']} "
+           f"BLOCKED={result['counts']['BLOCKED']} artifacts checked={result['artifacts_checked']}"]
+    out += ["WARNING: " + clean(w) for w in result["warnings"]]
+    out += ["ERROR: " + clean(e) for e in result["errors"]]
+    out.append("FORMAT OK" if not result["errors"] else f"{len(result['errors'])} problem(s)")
+    out.append(result["notice"])
+    return "\n".join(out)
+
+
 # --------------------------------------------------------------------------- commands
 
 def cmd_graph(args):
@@ -414,14 +596,22 @@ def main(argv=None):
     g.add_argument("--ids", dest="tasks_ids", help="comma-separated task ids whose ownership applies")
     g.add_argument("--wave", type=int, help="check the tasks in this wave")
     g.add_argument("--json", action="store_true")
+    b = sub.add_parser("browser-report", help="check the format and consistency of a BROWSER-QA.md report (not evidence)")
+    b.add_argument("report", nargs="?", default="docs/auto-builder/BROWSER-QA.md")
+    b.add_argument("--root", default=".")
+    b.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     try:
         if args.command == "graph":
             result = cmd_graph(args)
+            text = render(result)
+        else:
+            result = cmd_browser_report(args)
+            text = render_report(result)
     except Problem as exc:
         print("ERROR: " + clean(exc), file=sys.stderr)
         return 2
-    print(json.dumps(result, indent=2) if args.json else render(result))
+    print(json.dumps(result, indent=2) if args.json else text)
     return 1 if result["errors"] else 0
 
 
