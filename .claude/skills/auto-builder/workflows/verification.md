@@ -37,7 +37,7 @@ Copy into the milestone's row in `TASKS.md` and tick only what actually happened
 
 Never upgrade a state without running a new check. "The code looks right" and "the build succeeded" are not evidence for behaviour.
 
-## Reviewer brief (template for `critical-reviewer` / `qa-engineer`)
+## Reviewer brief (template for `critical-reviewer` / `qa-engineer`; packet rules and wording are in `independent-review.md`)
 
 > You are read-only: do not modify files, install packages, start long-lived servers or write outside a temp directory (your Bash access is not technically restricted, so this is an instruction). `qa-engineer`: return proposed test code inline in your report; the lead writes the files. Review milestone **<name>** in <paths/diff range>. Requirements: `docs/auto-builder/REQUIREMENTS.md`; acceptance criteria and expected outcome: `TASKS.md` row <id>. Compare the implementation with the requirements and list missing or partial functionality. Examine edge cases and failure paths, the architectural decisions in `DECISIONS.md`, and security and reliability concerns. Challenge the assumptions the implementer made (list the ones you find). Do not approve by default: report severity-ranked findings with file:line and a suggested fix, and state exactly what you did **not** check. Do not modify files.
 

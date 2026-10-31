@@ -81,6 +81,24 @@ echo keep > "$art/docs/TASKS.md"
 "$proj/.claude/skills/auto-builder/scripts/init-artifacts.sh" "$art/docs" >/dev/null 2>&1
 t "init-artifacts: kept existing file" grep -q keep "$art/docs/TASKS.md"
 
+# --- helper script: installed non-executable, works from the installed location with cwd = user's project
+abi="$proj/.claude/skills/auto-builder/scripts/ab.py"
+t "helper installed" test -f "$abi"
+nt "helper installed non-executable" test -x "$abi"
+mkdir -p "$proj/docs/auto-builder"
+cat > "$proj/docs/auto-builder/TASKS.md" <<'TASKS'
+## Tasks
+
+| ID | Task | Milestone | Dependencies | Acceptance criteria | Verification | Status | Owner | Files owned | Flags |
+|---|---|---|---|---|---|---|---|---|---|
+| T1 | api | M1 | - | c | v | todo | backend-engineer | api/ | |
+| T2 | web | M1 | - | c | v | todo | frontend-engineer | web/ | |
+| T3 | e2e | M1 | T1,T2 | c | v | todo | qa-engineer | tests/ | |
+TASKS
+out="$( cd "$proj" && python3 -I "$abi" graph 2>&1 )"; rc=$?
+n=$((n+1)); if [ $rc -eq 0 ] && printf '%s' "$out" | grep -q "wave 1: T1, T2" && printf '%s' "$out" | grep -q "wave 2: T3"; then echo "ok   - installed helper computes waves from the project cwd"; else echo "FAIL - installed helper rc=$rc: $out"; fails=$((fails+1)); fi
+t "helper left the project tree unchanged (no files written)" test -z "$(cd "$proj" && find . -newer "$abi" -type f ! -path './docs/auto-builder/TASKS.md' ! -path './.claude/*' 2>/dev/null)"
+
 # --- hooks behave
 hook="$proj/.claude/skills/auto-builder/scripts/hooks/protect-secrets.sh"
 echo '{"tool_input":{"file_path":"/x/.env"}}' | "$hook" >/dev/null 2>&1; rc=$?

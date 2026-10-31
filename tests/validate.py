@@ -447,6 +447,89 @@ def check_router():
     ok("| Flags |" in tasks and "Verified at (sha)" in tasks and "Strict grammar" in tasks, "TASKS.md template needs Flags, Verified at (sha) and the strict-grammar note")
 
 
+AB_IMPORT_ALLOW = {"argparse", "fnmatch", "json", "os", "re", "subprocess", "sys", "hashlib", "stat"}
+AB_FORBIDDEN_OS = {"system", "popen", "remove", "unlink", "rename", "replace", "mkdir", "makedirs", "rmdir", "chmod",
+                   "chown", "symlink", "link", "write", "truncate", "utime", "putenv", "execv", "execl", "spawnl", "fork"}
+AB_FORBIDDEN_NAMES = {"eval", "exec", "compile", "__import__", "input", "breakpoint"}
+
+
+def check_ab():
+    """The helper must stay read-only, offline, allow-listed and non-executable; docs must invoke it safely."""
+    import ast
+    ab = os.path.join(SKILL_DIR, "scripts", "ab.py")
+    if not ok(os.path.isfile(ab), "missing scripts/ab.py"):
+        return
+    src = open(ab, encoding="utf-8").read()
+    tree = ast.parse(src)
+    imports = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports |= {a.name.split(".")[0] for a in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            imports.add((node.module or "").split(".")[0])
+    ok(imports <= AB_IMPORT_ALLOW, f"ab.py imports outside the allow-list: {sorted(imports - AB_IMPORT_ALLOW)}")
+    # forbidden calls / names
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            f = node.func
+            if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and f.value.id == "os" and f.attr in AB_FORBIDDEN_OS:
+                ok(False, f"ab.py calls os.{f.attr} (must be read-only)")
+            if isinstance(f, ast.Name) and f.id in AB_FORBIDDEN_NAMES:
+                ok(False, f"ab.py calls {f.id}()")
+            if isinstance(f, ast.Name) and f.id == "open":
+                mode = None
+                if len(node.args) > 1 and isinstance(node.args[1], ast.Constant):
+                    mode = node.args[1].value
+                for kw in node.keywords:
+                    if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
+                        mode = kw.value.value
+                ok(mode in (None, "r", "rb"), f"ab.py opens a file with mode {mode!r} (read-only only)")
+            for kw in node.keywords:
+                if kw.arg == "shell":
+                    ok(isinstance(kw.value, ast.Constant) and kw.value.value is False, "ab.py must not use shell=True")
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Subscript) and isinstance(t.value, ast.Attribute) and t.value.attr == "environ":
+                    ok(False, "ab.py writes os.environ")
+    # subprocess is confined to run_git and git is allow-listed
+    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
+        uses = any(isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "subprocess" for n in ast.walk(fn))
+        if uses:
+            ok(fn.name == "run_git", f"ab.py uses subprocess outside run_git (in {fn.name})")
+    for needle in ("--no-pager", "--no-optional-locks", "core.fsmonitor=false", "GIT_CONFIG_NOSYSTEM", "shell=False", "timeout="):
+        ok(needle in src, f"ab.py git hardening missing: {needle}")
+    ok("allowed = {" in src and "rev-parse" in src, "ab.py must allow-list git subcommands")
+    ok("writes nothing" in src.lower(), "ab.py docstring must state it writes nothing")
+    ok(not (os.stat(ab).st_mode & 0o111), "ab.py must ship non-executable (invoke as python3 -I)")
+    # cap consistency with SKILL.md Limits
+    skill = open(os.path.join(SKILL_DIR, "SKILL.md"), encoding="utf-8").read()
+    m = re.search(r"\| concurrent workers per wave \| (\d+) \|", skill)
+    mm = re.search(r"^MAX_WORKERS_PER_WAVE = (\d+)", src, flags=re.M)
+    ok(bool(m and mm and m.group(1) == mm.group(1)), "MAX_WORKERS_PER_WAVE must equal the SKILL.md Limits cap")
+    # nothing wires the helper into hooks or settings; docs always invoke it isolated
+    ok(not any(os.path.exists(os.path.join(ROOT, ".claude", f)) for f in ("settings.json", "settings.local.json")), "no settings file may ship")
+    for f in os.listdir(os.path.join(SKILL_DIR, "scripts", "hooks")):
+        ok("ab.py" not in open(os.path.join(SKILL_DIR, "scripts", "hooks", f), encoding="utf-8").read(), f"hook {f} must not call ab.py")
+    for path in md_files():
+        for n, line in enumerate(open(path, encoding="utf-8").read().splitlines(), 1):
+            if "scripts/ab.py" in line and "python3" in line:
+                ok("python3 -I" in line, f"{rel(path)}:{n}: ab.py must be invoked as 'python3 -I'")
+    # swarm and fresh-context review playbooks carry their safety rules
+    swarm = open(os.path.join(SKILL_DIR, "workflows", "swarm.md"), encoding="utf-8").read().lower()
+    for ph in ("task table", "hypothesis", "parallelizable", "sequential", "shared-file", "high-risk", "needs a human decision",
+               "ab.py graph", "read-only", "worker brief", "narrowest", "no formatter or code generator", "`pass`, `issues` or `blocked`",
+               "gap, never a pass", "counts as an attempt", "shared working tree", "violation", "parallelism never bypasses a gate",
+               "rollback", "user's approval", "never reset or clean", "--check-changes", "untracked", "lead only"):
+        ok(ph in swarm or ph == "lead only", f"swarm.md missing: '{ph}'")
+    rev = open(os.path.join(SKILL_DIR, "workflows", "independent-review.md"), encoding="utf-8").read().lower()
+    for ph in ("separate context", "not independent of the lead's framing", "| l0", "| l1", "| l2", "multi-model", "distinct models",
+               "unedited", "**raw**", "do **not** give", "reproduce or drop", "read the command before running it", "untrusted",
+               "different vendor", "explicit approval", "for this run", "redact", "paid api", "do not claim more independence",
+               "do not approve by default", "state what you did **not** check", "never the default"):
+        ok(ph in rev, f"independent-review.md missing: '{ph}'")
+    ok("workflows/swarm.md" in skill and "workflows/independent-review.md" in skill, "SKILL.md must link swarm and fresh-context review")
+
+
 def check_security():
     """The security-engineer agent and the Security gate must exist and be wired into the lifecycle."""
     path = os.path.join(AGENT_DIR, "security-engineer.md")
@@ -549,6 +632,7 @@ def main():
     check_protocol()
     check_security()
     check_router()
+    check_ab()
     check_hygiene()
     if errors:
         print(f"FAILED: {len(errors)} problem(s) in {checks} checks")

@@ -36,6 +36,18 @@ MUTATIONS = [
     ("agent removed", ".claude/agents/researcher.md", None, None, "exactly nine specialist agents"),
     ("phase 6 disconnected from security gate", f"{SK}/SKILL.md", "Where the Security gate applies to the milestone, run it. ", "", "Phase 6 not connected"),
     ("old 'or accepted' wording for Potential Critical", f"{SK}/SKILL.md", "blocks exactly like a Critical until confirmed and fixed or disproved with evidence (never accepted)", "keeps blocking until confirmed and fixed, disproved with evidence, or accepted", "Potential Critical must never be acceptable"),
+    ("ab.py imports socket", f"{SK}/scripts/ab.py", "import subprocess", "import subprocess\nimport socket", "imports outside the allow-list"),
+    ("ab.py writes a file", f"{SK}/scripts/ab.py", 'with open(real, "r", encoding="utf-8", errors="replace") as fh:', 'with open(real, "w", encoding="utf-8") as fh:', "read-only only"),
+    ("ab.py removes a file", f"{SK}/scripts/ab.py", "    return CONTROL_RE.sub", "    os.remove('x')\n    return CONTROL_RE.sub", "calls os.remove"),
+    ("ab.py uses shell", f"{SK}/scripts/ab.py", "shell=False", "shell=True", "shell"),
+    ("ab.py drops git hardening", f"{SK}/scripts/ab.py", '"core.fsmonitor=false"', '"core.x=false"', "git hardening missing"),
+    ("ab.py worker cap drifts from Limits", f"{SK}/scripts/ab.py", "MAX_WORKERS_PER_WAVE = 4", "MAX_WORKERS_PER_WAVE = 9", "MAX_WORKERS_PER_WAVE"),
+    ("ab.py shipped executable", f"{SK}/scripts/ab.py", "@chmod+x", "", "non-executable"),
+    ("docs invoke ab.py without -I", f"{SK}/workflows/swarm.md", "python3 -I ${CLAUDE_SKILL_DIR}/scripts/ab.py graph`", "python3 ${CLAUDE_SKILL_DIR}/scripts/ab.py graph`", "must be invoked as 'python3 -I'"),
+    ("swarm drops ownership violation rule", f"{SK}/workflows/swarm.md", "**violation: record it as a gap**", "fine", "violation"),
+    ("swarm lets parallelism bypass gates", f"{SK}/workflows/swarm.md", "**Parallelism never bypasses a gate.**", "Parallelism is fast.", "parallelism never bypasses a gate"),
+    ("review drops reproduce-or-drop", f"{SK}/workflows/independent-review.md", "## Reproduce or drop", "## Reproduce", "reproduce or drop"),
+    ("review allows implicit external review", f"{SK}/workflows/independent-review.md", "explicit approval **for this run**", "approval", "for this run"),
     ("3-attempt limit defined twice", f"{SK}/SKILL.md", "Iteration limits are defined once: **3** attempts", "Iteration limits: 3 fix attempts and **3** attempts", "defined exactly once"),
 ]
 
@@ -59,13 +71,16 @@ def main():
             shutil.rmtree(tree, ignore_errors=True)
             shutil.copytree(base, tree)
             path = os.path.join(tree, rel)
-            if old is None:
+            if old is None:  # delete the file
                 os.remove(path)
+            elif old == "@chmod+x":  # make the file executable
+                os.chmod(path, os.stat(path).st_mode | 0o111)
             else:
                 text = open(path, encoding="utf-8").read()
                 if old not in text:
                     print(f"FAIL - {name}: mutation target not found in {rel}"); fails += 1; continue
-                open(path, "w", encoding="utf-8").write(text.replace(old, new) if opt and opt[0] else text.replace(old, new, 1))
+                replaced = text.replace(old, new) if opt and opt[0] else text.replace(old, new, 1)
+                open(path, "w", encoding="utf-8").write(replaced)
             rc, out = run_validate(tree)
             if rc != 0 and expect.lower() in out.lower():
                 print(f"ok   - {name}")

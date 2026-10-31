@@ -1,0 +1,429 @@
+#!/usr/bin/env python3
+"""AUTO-BUILDER read-only helper (optional). Standard library only; writes nothing.
+
+Run it as:  python3 -I ab.py <command> [options]   (-I = isolated mode: nothing is imported
+from the current directory, which is the user's project)
+
+Commands
+  graph   Validate the task table in TASKS.md, compute parallel waves, detect ownership
+          conflicts, and (optionally) check that the files actually changed stay inside the
+          declared ownership.
+
+Design rules (enforced by tests/test_ab.py):
+  * read-only: no file writes, no deletes, no network, no eval/exec, no shell;
+  * all input is untrusted: sizes are capped, paths are confined to the project root,
+    refs are validated, git runs from a fixed allow-list with repo config neutralised;
+  * output has control characters stripped.
+Exit codes: 0 ok (warnings allowed), 1 problems found, 2 usage or unparseable input.
+"""
+import argparse
+import fnmatch
+import json
+import os
+import re
+import subprocess
+import sys
+
+MAX_FILE_BYTES = 1_000_000
+MAX_LINES = 20_000
+MAX_ROWS = 500
+MAX_GIT_OUTPUT = 5_000_000
+MAX_WORKERS_PER_WAVE = 4  # must equal the "concurrent workers per wave" cap in SKILL.md Limits
+
+ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,30}$")
+SHA_RE = re.compile(r"^[0-9a-fA-F]{7,64}$")
+FLAGS_ALLOWED = {"high-risk", "human-decision", "shared-file"}
+DONE_WORDS = {"done", "complete", "completed", "verified"}
+CONTROL_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+STATE_DIR = "docs/auto-builder"
+
+# Files that are shared by nature: a task owning one of these is auto-flagged `shared-file`.
+SHARED_PATTERNS = [
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "cargo.lock", "go.sum", "gemfile.lock",
+    "composer.lock", "package.json", "pyproject.toml", "requirements*.txt", "go.mod", "cargo.toml",
+    "*schema*", "*/migrations/*", "migrations/*", "*.sql", "index.*", "*/index.*", "__init__.py", "*/__init__.py",
+    "*routes*", "*urls.py", "*.snap", "*__snapshots__*", "*.generated.*", "*.min.js", "dist/*",
+]
+
+
+class Problem(Exception):
+    """Unparseable or unsafe input: exit code 2."""
+
+
+def clean(text):
+    return CONTROL_RE.sub("", str(text))
+
+
+# --------------------------------------------------------------------------- safe input
+
+def resolve_root(path):
+    root = os.path.realpath(path or ".")
+    if not os.path.isdir(root):
+        raise Problem(f"root is not a directory: {clean(path)}")
+    return root
+
+
+def read_text(path, root):
+    """Read a regular, non-symlink file that lives inside root, with size caps."""
+    full = os.path.join(root, path) if not os.path.isabs(path) else path
+    try:
+        st = os.lstat(full)
+    except OSError:
+        raise Problem(f"cannot read: {clean(path)}")
+    if os.path.islink(full) or not os.path.isfile(full):
+        raise Problem(f"refusing non-regular file or symlink: {clean(path)}")
+    real = os.path.realpath(full)
+    if os.path.commonpath([real, root]) != root:
+        raise Problem(f"path escapes the project root: {clean(path)}")
+    if st.st_size > MAX_FILE_BYTES:
+        raise Problem(f"file too large (> {MAX_FILE_BYTES} bytes): {clean(path)}")
+    with open(real, "r", encoding="utf-8", errors="replace") as fh:
+        text = fh.read(MAX_FILE_BYTES + 1)
+    if text.count("\n") > MAX_LINES:
+        raise Problem(f"too many lines (> {MAX_LINES}): {clean(path)}")
+    return text
+
+
+def run_git(root, args):
+    """Run an allow-listed, read-only git command with repo configuration neutralised."""
+    allowed = {"rev-parse", "merge-base", "diff", "status", "log", "cat-file", "ls-files"}
+    if not args or args[0] not in allowed:
+        raise Problem("internal: git subcommand not allowed")
+    env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "LC_ALL": "C",
+        "HOME": os.devnull,
+    }
+    cmd = ["git", "--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.pager=cat",
+           "-c", "core.hooksPath=" + os.devnull, "-c", "diff.external=", "-C", root] + args
+    try:
+        res = subprocess.run(cmd, cwd=root, env=env, stdin=subprocess.DEVNULL, capture_output=True,
+                             timeout=20, shell=False, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return 1, b""
+    return res.returncode, res.stdout[:MAX_GIT_OUTPUT]
+
+
+def valid_ref(ref):
+    return ref == "HEAD" or bool(SHA_RE.match(ref))
+
+
+# --------------------------------------------------------------------------- markdown tables
+
+def find_table(text, heading):
+    """Return (header_cells, rows) of the first table after a '## <heading>' line."""
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r"^#{2,3}\s+" + re.escape(heading) + r"\s*$", line.strip()):
+            start = i + 1
+            break
+    if start is None:
+        raise Problem(f"no '{heading}' section found")
+    header, rows = None, []
+    for line in lines[start:]:
+        s = line.strip()
+        if s.startswith("#") and header is not None:
+            break
+        if not s.startswith("|"):
+            if header is not None and not s:
+                break
+            continue
+        cells = [c.strip() for c in s.strip("|").split("|")]
+        if header is None:
+            header = [c.lower() for c in cells]
+            continue
+        if all(set(c) <= set("-: ") for c in cells):
+            continue
+        rows.append(cells)
+        if len(rows) > MAX_ROWS:
+            raise Problem(f"too many rows (> {MAX_ROWS})")
+    if header is None:
+        raise Problem(f"no table under '{heading}'")
+    return header, rows
+
+
+def split_list(cell):
+    cell = cell.strip()
+    if cell in ("", "-"):
+        return []
+    return [p.strip() for p in cell.split(",") if p.strip()]
+
+
+def safe_owned_path(p):
+    """Strict grammar for 'Files owned' entries; returns an error string or None."""
+    if p.startswith(("/", "~")) or re.match(r"^[A-Za-z]:", p) or "\\" in p:
+        return f"absolute or non-portable path: {p!r}"
+    if any(part == ".." for part in p.split("/")):
+        return f"path traversal: {p!r}"
+    if re.fullmatch(r"[*?./\[\]]*", p) or p in ("**", "**/*", "*/**"):
+        return f"glob matches everything: {p!r}"
+    return None
+
+
+def parse_tasks(text):
+    header, rows = find_table(text, "Tasks")
+    col = {name: i for i, name in enumerate(header)}
+    required = ["id", "dependencies", "owner", "files owned"]
+    missing = [r for r in required if r not in col]
+    if missing:
+        raise Problem("task table missing required column(s): " + ", ".join(missing))
+    tasks, errors, seen = {}, [], set()
+    for n, r in enumerate(rows, 1):
+        if len(r) < len(header):
+            r = r + [""] * (len(header) - len(r))
+        tid = r[col["id"]]
+        if not ID_RE.match(tid):
+            raise Problem(f"row {n}: invalid task id {clean(tid)[:40]!r}")
+        if tid in seen:
+            raise Problem(f"duplicate task id {tid}")
+        seen.add(tid)
+        deps = split_list(r[col["dependencies"]])
+        for d in deps:
+            if not ID_RE.match(d):
+                raise Problem(f"{tid}: invalid dependency id {clean(d)[:40]!r}")
+        files = split_list(r[col["files owned"]])
+        for f in files:
+            bad = safe_owned_path(f)
+            if bad:
+                raise Problem(f"{tid}: {clean(bad)}")
+        flags = split_list(r[col["flags"]]) if "flags" in col else []
+        for fl in flags:
+            if fl not in FLAGS_ALLOWED:
+                raise Problem(f"{tid}: unknown flag {clean(fl)[:30]!r} (allowed: {sorted(FLAGS_ALLOWED)})")
+        status = r[col["status"]].strip().lower() if "status" in col else ""
+        tasks[tid] = {"id": tid, "deps": deps, "owner": r[col["owner"]].strip(), "files": files,
+                      "flags": flags, "status": status, "done": status in DONE_WORDS}
+    return tasks, errors
+
+
+# --------------------------------------------------------------------------- analysis
+
+def literal_prefix(p):
+    m = re.search(r"[*?\[]", p)
+    return p if not m else p[: m.start()]
+
+
+def overlaps(a, b):
+    a, b = a.rstrip("/"), b.rstrip("/")
+    if a == b or b.startswith(a + "/") or a.startswith(b + "/"):
+        return True
+    wild = any(c in a + b for c in "*?[")
+    if wild:
+        if fnmatch.fnmatchcase(a, b) or fnmatch.fnmatchcase(b, a):
+            return True
+        la, lb = literal_prefix(a), literal_prefix(b)
+        return la.startswith(lb) or lb.startswith(la)
+    return False
+
+
+def is_shared(path):
+    low = path.lower()
+    base = low.rsplit("/", 1)[-1]
+    return any(fnmatch.fnmatchcase(low, p) or fnmatch.fnmatchcase(base, p) for p in SHARED_PATTERNS)
+
+
+def covered(path, patterns):
+    for p in patterns:
+        p = p.rstrip("/")
+        if path == p or path.startswith(p + "/") or fnmatch.fnmatchcase(path, p):
+            return True
+    return False
+
+
+def analyse(tasks, include_done=False):
+    errors, warnings = [], []
+    active = {k: v for k, v in tasks.items() if include_done or not v["done"]}
+    # dependency checks
+    for t in tasks.values():
+        for d in t["deps"]:
+            if d not in tasks:
+                errors.append(f"{t['id']}: depends on unknown task {d}")
+            if d == t["id"]:
+                errors.append(f"{t['id']}: depends on itself")
+    # cycles (Kahn) over active tasks, dependencies on done tasks count as satisfied
+    indeg = {k: 0 for k in active}
+    out = {k: [] for k in active}
+    for t in active.values():
+        for d in t["deps"]:
+            if d in active:
+                indeg[t["id"]] += 1
+                out[d].append(t["id"])
+    queue = sorted(k for k, v in indeg.items() if v == 0)
+    order, wave = [], {}
+    while queue:
+        n = queue.pop(0)
+        order.append(n)
+        wave[n] = 1 + max([wave[d] for d in active[n]["deps"] if d in active] or [0])
+        for m in sorted(out[n]):
+            indeg[m] -= 1
+            if indeg[m] == 0:
+                queue.append(m)
+    cyclic = sorted(k for k in active if k not in wave)
+    if cyclic:
+        errors.append("dependency cycle involving: " + ", ".join(cyclic))
+    # blocked by human decisions
+    needs = {k for k, v in active.items() if "human-decision" in v["flags"]}
+    blocked, changed = set(), True
+    while changed:
+        changed = False
+        for k, v in active.items():
+            if k not in blocked and any(d in needs or d in blocked for d in v["deps"]):
+                blocked.add(k)
+                changed = True
+    # auto shared-file flagging
+    auto_shared = {}
+    for k, v in active.items():
+        hits = [f for f in v["files"] if is_shared(f)]
+        if hits and "shared-file" not in v["flags"]:
+            auto_shared[k] = hits
+    shared = {k for k, v in active.items() if "shared-file" in v["flags"]} | set(auto_shared)
+    # per-wave checks
+    waves = {}
+    for k, w in wave.items():
+        waves.setdefault(w, []).append(k)
+    for w in sorted(waves):
+        ids = sorted(waves[w])
+        if len(ids) > MAX_WORKERS_PER_WAVE:
+            warnings.append(f"wave {w}: {len(ids)} tasks exceed the concurrent-workers cap ({MAX_WORKERS_PER_WAVE}); split the wave")
+        if len(ids) >= 2:
+            for k in ids:
+                if not active[k]["owner"] or not active[k]["files"]:
+                    errors.append(f"wave {w}: parallel task {k} needs an Owner and Files owned")
+            for i, a in enumerate(ids):
+                for b in ids[i + 1:]:
+                    for fa in active[a]["files"]:
+                        for fb in active[b]["files"]:
+                            if overlaps(fa, fb):
+                                errors.append(f"wave {w}: ownership conflict between {a} ({fa}) and {b} ({fb})")
+                                break
+                        else:
+                            continue
+                        break
+    for k in sorted(auto_shared):
+        warnings.append(f"{k}: owns shared file(s) {', '.join(auto_shared[k])}; auto-flagged shared-file (integrate serially)")
+    for k in sorted(shared):
+        if k in wave and len(waves[wave[k]]) > 1 and any(is_shared(f) for f in active[k]["files"]):
+            others = [o for o in waves[wave[k]] if o != k]
+            warnings.append(f"{k}: shared-file task runs in wave {wave[k]} alongside {', '.join(sorted(others))}; the lead integrates it last")
+    return {"errors": errors, "warnings": warnings, "waves": {str(w): sorted(v) for w, v in sorted(waves.items())},
+            "needs_decision": sorted(needs), "blocked_by_decision": sorted(blocked), "shared_file": sorted(shared),
+            "high_risk": sorted(k for k, v in active.items() if "high-risk" in v["flags"]),
+            "done": sorted(k for k, v in tasks.items() if v["done"])}
+
+
+def changed_files(root, base):
+    files = set()
+    rc, out = run_git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])
+    if rc != 0:
+        raise Problem("git status failed (is this a git repository?)")
+    parts = out.decode("utf-8", "replace").split("\0")
+    i = 0
+    while i < len(parts):
+        e = parts[i]
+        if len(e) > 3:
+            files.add(e[3:])
+            if e[0] in "RC":
+                i += 1
+                if i < len(parts) and parts[i]:
+                    files.add(parts[i])
+        i += 1
+    if base:
+        if not valid_ref(base):
+            raise Problem("invalid --base (use HEAD or a hex commit id)")
+        rc, out = run_git(root, ["diff", "--name-only", "-z", "--no-ext-diff", "--no-textconv", base, "--"])
+        if rc != 0:
+            raise Problem("git diff failed (unknown --base?)")
+        files |= {p for p in out.decode("utf-8", "replace").split("\0") if p}
+    return sorted(files)
+
+
+def check_changes(tasks, wave_ids, changed):
+    owned = {}
+    for k in wave_ids:
+        owned[k] = tasks[k]["files"]
+    allp = [p for v in owned.values() for p in v]
+    problems = []
+    for f in changed:
+        if f == ".git" or f.startswith(".git/") or f == STATE_DIR or f.startswith(STATE_DIR + "/"):
+            problems.append(f"{f}: state files and .git are lead-only; a worker must not change them")
+        elif not covered(f, allp):
+            problems.append(f"{f}: outside the declared ownership of the checked tasks")
+    return problems
+
+
+# --------------------------------------------------------------------------- commands
+
+def cmd_graph(args):
+    root = resolve_root(args.root)
+    text = read_text(args.tasks, root)
+    tasks, _ = parse_tasks(text)
+    result = analyse(tasks, include_done=args.include_done)
+    if args.check_changes or args.changed:
+        ids = [t for t in (args.tasks_ids.split(",") if args.tasks_ids else []) if t]
+        for t in ids:
+            if t not in tasks:
+                raise Problem(f"unknown task in --ids: {clean(t)[:30]}")
+        if not ids:
+            ids = [k for k, v in tasks.items() if v["status"] in ("in progress", "in-progress", "wip")]
+            if args.wave:
+                ids = result["waves"].get(str(args.wave), [])
+        if not ids:
+            raise Problem("no tasks selected for the change check (use --ids or --wave)")
+        changed = [clean(p) for p in args.changed] if args.changed else changed_files(root, args.base)
+        result["change_problems"] = check_changes(tasks, ids, changed)
+        result["changed"] = changed
+        result["errors"] = result["errors"] + result["change_problems"]
+    return result
+
+
+def render(result):
+    out = []
+    for w, ids in result["waves"].items():
+        out.append(f"wave {w}: {', '.join(ids)}")
+    if result["done"]:
+        out.append("done: " + ", ".join(result["done"]))
+    if result["needs_decision"]:
+        out.append("needs user decision (not schedulable): " + ", ".join(result["needs_decision"]))
+    if result["blocked_by_decision"]:
+        out.append("blocked by those decisions: " + ", ".join(result["blocked_by_decision"]))
+    if result["high_risk"]:
+        out.append("high-risk (review at the milestone gate): " + ", ".join(result["high_risk"]))
+    for w in result["warnings"]:
+        out.append("WARNING: " + clean(w))
+    for e in result["errors"]:
+        out.append("ERROR: " + clean(e))
+    out.append("OK" if not result["errors"] else f"{len(result['errors'])} problem(s)")
+    return "\n".join(out)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="ab.py", description="AUTO-BUILDER read-only helper")
+    sub = ap.add_subparsers(dest="command", required=True)
+    g = sub.add_parser("graph", help="validate the TASKS.md task graph and ownership")
+    g.add_argument("tasks", nargs="?", default="docs/auto-builder/TASKS.md")
+    g.add_argument("--root", default=".")
+    g.add_argument("--include-done", action="store_true")
+    g.add_argument("--check-changes", action="store_true", help="compare changed files (git) with declared ownership")
+    g.add_argument("--changed", nargs="*", help="explicit changed paths instead of git (for tests and dry runs)")
+    g.add_argument("--base", help="HEAD or a hex commit id to diff against (in addition to the working tree)")
+    g.add_argument("--ids", dest="tasks_ids", help="comma-separated task ids whose ownership applies")
+    g.add_argument("--wave", type=int, help="check the tasks in this wave")
+    g.add_argument("--json", action="store_true")
+    args = ap.parse_args(argv)
+    try:
+        if args.command == "graph":
+            result = cmd_graph(args)
+    except Problem as exc:
+        print("ERROR: " + clean(exc), file=sys.stderr)
+        return 2
+    print(json.dumps(result, indent=2) if args.json else render(result))
+    return 1 if result["errors"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
